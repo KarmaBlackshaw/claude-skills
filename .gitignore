@@ -1,0 +1,20 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors / local tooling
+.idea/
+.vscode/
+.claude/
+*.swp
+*.swo
+
+# Local scratch / agent outputs
+mnt/
+
+# Logs
+*.log
+
+# Local install artifacts
+*.bak
+*.tar.gz

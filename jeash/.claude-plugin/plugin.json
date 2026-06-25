@@ -1,0 +1,8 @@
+{
+  "name": "jeash",
+  "description": "Jeash agent roster as a plugin — 6 mentionable agents (architect, frontend, ux, dx, review, qa) plus jeash:* launcher skills that dispatch them. Includes a library-aware multi-lens code review.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Jeash"
+  }
+}
