@@ -60,27 +60,20 @@ Create `$REPO/CLAUDE.local.md` from the **Pointer seed** below, substituting the
 git -C "$REPO" check-ignore CLAUDE.local.md >/dev/null 2>&1 || printf '\n# Claude local memory pointer (machine-specific Obsidian paths)\nCLAUDE.local.md\n' >> "$REPO/.gitignore"
 ```
 
-### 6. Install the hooks
+### 6. Install + register the hooks (idempotent)
 ```bash
-mkdir -p "$REPO/.claude/hooks"
-cp "$SKILL_DIR/assets/obsidian-recall.sh" "$SKILL_DIR/assets/obsidian-push.sh" "$REPO/.claude/hooks/"
-chmod +x "$REPO/.claude/hooks/obsidian-recall.sh" "$REPO/.claude/hooks/obsidian-push.sh"
+bash "$SKILL_DIR/assets/sync-hooks.sh" "$REPO"
 ```
+One command: copies the current `obsidian-recall.sh` + `obsidian-push.sh` into `$REPO/.claude/hooks/`, then merges SessionStart(obsidian-recall) + Stop(obsidian-push) into `settings.local.json` only if absent. Settings are never edited by hand. Safe to re-run — this is also how you propagate a later hook change (see **Updating an existing install**).
 
-### 7. Register the hooks (idempotent)
-```bash
-bash "$SKILL_DIR/assets/register-hooks.sh" "$REPO"
-```
-Merges SessionStart(obsidian-recall) + Stop(obsidian-push) into `settings.local.json` only if absent — safe to re-run.
-
-### 8. Conflict check (critical)
+### 7. Conflict check (critical)
 A Stop/PostCompact hook that does `cat >` on a vault file will **clobber** the spoke on every fire. Scan both settings for one:
 ```bash
 grep -rl "cat >.*Active Context\|obsidian-context-sync" "$HOME/.claude/settings.json" "$REPO/.claude/" 2>/dev/null
 ```
 If found, warn the user and offer to retire it (unregister + note the backup). Memory-write hooks must **append**, never overwrite.
 
-### 9. Verify + finish
+### 8. Verify + finish
 ```bash
 export CLAUDE_PROJECT_DIR="$REPO"
 jq empty "$REPO/.claude/settings.local.json" && echo "settings valid"
@@ -153,6 +146,15 @@ CODING_RULES=<vault>/Projects/<repo>/Coding Rules.md
 -->
 ```
 
+## Updating an existing install
+Changed a hook (e.g. the recall/push scripts)? Propagate it to every wired repo with **no manual copying** — `sync-hooks.sh` is idempotent (re-copies the current hooks, re-registers only if missing):
+```bash
+for repo in <wired-repo-roots…>; do
+  bash "$SKILL_DIR/assets/sync-hooks.sh" "$repo"
+done
+```
+Find wired repos with `find <dir> -maxdepth 2 -name CLAUDE.local.md`. Settings never need hand-editing: registration lives in the per-machine, gitignored `settings.local.json` and is handled by the script; the committed `settings.json` is intentionally left untouched so the memory hooks are never forced on teammates who clone the repo.
+
 ## Common mistakes
 | Mistake | Fix |
 |---|---|
@@ -160,4 +162,4 @@ CODING_RULES=<vault>/Projects/<repo>/Coding Rules.md
 | Overwriting the committed `CLAUDE.md` | Append pointer to the gitignored `CLAUDE.local.md` instead |
 | Non-idempotent re-runs | Guard settings + gitignore edits (the provided scripts already do) |
 | A hook present on disk but unregistered | Present ≠ wired — always run the Verify step |
-| A `cat >` memory-write hook | It clobbers the note; must append (Step 8) |
+| A `cat >` memory-write hook | It clobbers the note; must append (Step 7) |
