@@ -19,7 +19,17 @@ ACTIVE="$(getpath ACTIVE_CONTEXT)"
 
 out=""
 if [ -n "$LEARNINGS" ] && [ -f "$LEARNINGS" ]; then
-  out+="# Global Master Learnings (Obsidian hub)"$'\n\n'"$(cat "$LEARNINGS")"$'\n\n'
+  out+="# Global Master Learnings (Obsidian hub — index)"$'\n\n'"$(cat "$LEARNINGS")"$'\n\n'
+  # Expand every atomic lesson note. The notes folder is the hub file without its
+  # extension: <vault>/Learnings.md -> <vault>/Learnings/. Index + full detail.
+  NOTES_DIR="${LEARNINGS%.md}"
+  if [ -d "$NOTES_DIR" ]; then
+    shopt -s nullglob
+    for note in "$NOTES_DIR"/*.md; do
+      out+="## Lesson: $(basename "${note%.md}")"$'\n\n'"$(cat "$note")"$'\n\n'
+    done
+    shopt -u nullglob
+  fi
 fi
 if [ -n "$ACTIVE" ] && [ -f "$ACTIVE" ]; then
   out+="# Active Context — this repo (Obsidian spoke)"$'\n\n'"$(cat "$ACTIVE")"$'\n'

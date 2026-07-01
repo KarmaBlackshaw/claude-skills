@@ -19,7 +19,8 @@ Bootstraps hub-and-spoke long-term memory into the **current repo**: a shared Ob
 ## What gets created
 | Target | Purpose |
 |---|---|
-| `<vault>/Learnings.md` | Global cross-repo hub (created once, reused by every repo) |
+| `<vault>/Learnings.md` | Global cross-repo hub **index** (MOC; created once, reused by every repo) |
+| `<vault>/Learnings/` | Atomic lesson notes, one `<slug>.md` per lesson (the hub path minus its extension) |
 | `<vault>/Projects/<repo>/Active Context.md` | This repo's session-log spoke |
 | `<repo>/CLAUDE.local.md` | **gitignored** — declares the vault paths (single source of truth) |
 | `<repo>/.claude/hooks/obsidian-recall.sh` | SessionStart → injects memory into context |
@@ -47,7 +48,8 @@ Store the chosen root as `VAULT`. Define paths:
 - `LEARNINGS="$VAULT/Learnings.md"`
 
 ### 3. Create vault notes (NEVER overwrite existing)
-- Create `LEARNINGS` only if missing — use the **Learnings seed** below.
+- Create `LEARNINGS` (the index) only if missing — use the **Learnings seed** below.
+- Create the atomic-notes folder: `mkdir -p "${LEARNINGS%.md}"` (i.e. `<vault>/Learnings/`). Individual lesson notes are written later by `/sync-brain push`.
 - Create `ACTIVE` only if missing (`mkdir -p "$VAULT/Projects/$NAME"`) — use the **Active Context seed** below, substituting `<repo>` and the project's stack.
 
 ### 4. Write the pointer (`CLAUDE.local.md`)
@@ -97,17 +99,19 @@ Then tell the user: **fully restart Claude Code** (quit, not just close the wind
 > Cross-repo, long-term memory hub for Claude Code. Durable, reusable lessons that outlive any single session or project. Per-project context lives in each repo's spoke note.
 
 ## How this file works
-- **Scope:** lessons that generalize across projects. Project-only facts stay in that project's `Active Context.md`.
-- **Promotion:** when a session log entry proves durable and reusable, promote it here and link back with `[[wikilink]]`.
-- **Pull:** the `obsidian-recall.sh` SessionStart hook (and `/sync-brain pull`) inject this file at session start.
-- **Push:** `/sync-brain push` appends new lessons here at session end.
+- **Structure:** this file is an **index (MOC)** — one line per lesson linking to its atomic note in `Learnings/<slug>.md`. NOT a running log; project-only facts stay in that project's `Active Context.md`.
+- **Promotion is the exception.** A takeaway earns a note only if it's reusable beyond one session, behavior-changing, and not already covered. Most sessions add nothing.
+- **Curate, don't append.** Before adding, refine an existing note on the same topic in place (bump its `updated:`) instead of duplicating; the slug is the dedup key. Group stack-specific lessons (Supabase, TS, Vue…) under a stack heading.
+- **Soft cap.** When a section's index passes ~15–20 links or reads noisy, consolidate related notes into one sharper note.
+- **Pull:** the `obsidian-recall.sh` SessionStart hook (and `/sync-brain pull`) inject this index plus every linked note at session start.
+- **Push:** `/sync-brain push` writes/refines an atomic note and updates its index line via its Promotion gate at session end.
 
 ---
 
 ## Index (project spokes)
 
 ## Lessons
-<!-- Add dated (YYYY-MM-DD) cross-repo lessons here. -->
+<!-- Index only: each lesson is an atomic note at Learnings/<slug>.md; keep one dated one-line link here per lesson. Refine the existing note before adding a new one. -->
 ```
 
 ### Active Context seed (`<vault>/Projects/<repo>/Active Context.md`)
