@@ -89,4 +89,5 @@ Source: [[Active Context]] · <repo> · YYYY-MM-DD
 - Use the real current date.
 - Promotion to the hub is the exception, not the default — most sessions add nothing to `Learnings.md`.
 - Keep `Active Context.md` lean; keep `Learnings.md` small and curated — refine existing entries over appending new ones.
-- Pass file content through unchanged except for the edits above.
+- Pass file content through unchanged except for the edits above — in particular, preserve the spoke's `tags: [project/<repo>]` frontmatter (it's the note's graph hub label; see setup-obsidian-memory → **Graph project tag**).
+- Global atomic lesson notes stay tagged `[learning, …]` only — never add a `project/<repo>` tag; they're cross-repo and hub to `[[Learnings]]`.

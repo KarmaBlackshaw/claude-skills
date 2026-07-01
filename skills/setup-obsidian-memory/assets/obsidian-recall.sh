@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Injects Obsidian long-term memory (Learnings + Active Context) into context.
+# Injects Obsidian long-term memory (Learnings + Coding Rules + Active Context) into context.
 # SessionStart hook. Reads absolute vault paths from the repo's gitignored
 # CLAUDE.local.md so no personal paths live in git.
 # No-ops silently if CLAUDE.local.md or the target files are missing.
@@ -15,6 +15,7 @@ PTR="$ROOT/CLAUDE.local.md"
 getpath() { grep -m1 "^$1=" "$PTR" 2>/dev/null | cut -d= -f2- || true; }
 
 LEARNINGS="$(getpath LEARNINGS)"
+RULES="$(getpath CODING_RULES)"
 ACTIVE="$(getpath ACTIVE_CONTEXT)"
 
 out=""
@@ -30,6 +31,9 @@ if [ -n "$LEARNINGS" ] && [ -f "$LEARNINGS" ]; then
     done
     shopt -u nullglob
   fi
+fi
+if [ -n "$RULES" ] && [ -f "$RULES" ]; then
+  out+="# Coding Rules — this repo (Obsidian spoke)"$'\n\n'"$(cat "$RULES")"$'\n\n'
 fi
 if [ -n "$ACTIVE" ] && [ -f "$ACTIVE" ]; then
   out+="# Active Context — this repo (Obsidian spoke)"$'\n\n'"$(cat "$ACTIVE")"$'\n'

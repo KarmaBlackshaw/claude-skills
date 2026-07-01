@@ -21,7 +21,8 @@ Bootstraps hub-and-spoke long-term memory into the **current repo**: a shared Ob
 |---|---|
 | `<vault>/Learnings.md` | Global cross-repo hub **index** (MOC; created once, reused by every repo) |
 | `<vault>/Learnings/` | Atomic lesson notes, one `<slug>.md` per lesson (the hub path minus its extension) |
-| `<vault>/Projects/<repo>/Active Context.md` | This repo's session-log spoke |
+| `<vault>/Projects/<repo>/Active Context.md` | This repo's session-log spoke (frontmatter-tagged `project/<repo>`) |
+| `<vault>/.obsidian/graph.json` | Graph view config: tag nodes on + color groups (created once per vault, only if absent) |
 | `<repo>/CLAUDE.local.md` | **gitignored** — declares the vault paths (single source of truth) |
 | `<repo>/.claude/hooks/obsidian-recall.sh` | SessionStart → injects memory into context |
 | `<repo>/.claude/hooks/obsidian-push.sh` | Stop → nudges the model to run `/sync-brain push` |
@@ -50,7 +51,8 @@ Store the chosen root as `VAULT`. Define paths:
 ### 3. Create vault notes (NEVER overwrite existing)
 - Create `LEARNINGS` (the index) only if missing — use the **Learnings seed** below.
 - Create the atomic-notes folder: `mkdir -p "${LEARNINGS%.md}"` (i.e. `<vault>/Learnings/`). Individual lesson notes are written later by `/sync-brain push`.
-- Create `ACTIVE` only if missing (`mkdir -p "$VAULT/Projects/$NAME"`) — use the **Active Context seed** below, substituting `<repo>` and the project's stack.
+- Create `ACTIVE` only if missing (`mkdir -p "$VAULT/Projects/$NAME"`) — use the **Active Context seed** below, substituting `<repo>` and the project's stack. The seed's `tags: [project/<repo>]` frontmatter is what makes this project one labeled hub node in the graph (see **Graph project tag** below).
+- **Seed the graph config** (per vault, once): if `"$VAULT/.obsidian/graph.json"` does not exist, copy `"$SKILL_DIR/assets/graph.json"` there. It turns on tag nodes and color-codes lessons / spokes / conventions / project facts. Never overwrite an existing one — the user may have tuned it.
 
 ### 4. Write the pointer (`CLAUDE.local.md`)
 Create `$REPO/CLAUDE.local.md` from the **Pointer seed** below, substituting the real absolute paths into the machine-readable `KEY=value` block. **Do NOT touch the committed `CLAUDE.md`** — it stays authoritative for code conventions.
@@ -108,7 +110,11 @@ Then tell the user: **fully restart Claude Code** (quit, not just close the wind
 ```
 
 ### Active Context seed (`<vault>/Projects/<repo>/Active Context.md`)
+The `project/<repo>` tag is load-bearing — do not drop it (see **Graph project tag**).
 ```markdown
+---
+tags: [project/<repo>]
+---
 # Active Context — <repo>
 
 > Session log for Claude Code (newest first). This file is the **spoke**; the **hub** is [[Learnings]].
@@ -145,6 +151,9 @@ LEARNINGS=<LEARNINGS path>
 CODING_RULES=<vault>/Projects/<repo>/Coding Rules.md
 -->
 ```
+
+## Graph project tag
+The Obsidian graph can't label edges, and every project's spoke is named `Active Context.md`, so without tags the graph is N identical unlabeled nodes. Fix: every note under `Projects/<repo>/` (the spoke, `Coding Rules.md`, `Memory.md` + `Memory/*`) carries a nested `project/<repo>` frontmatter tag. With `showTags` on, that tag becomes one labeled hub node per project and its facts orbit it. Global `Learnings/` notes stay **untagged by project on purpose** — they're cross-repo and hub to `[[Learnings]]`. The seeded `graph.json` color-codes the four categories (lessons / spokes / conventions / project facts). To back-fill tags on an already-populated vault, add `project/<slug>` to each note's `tags:` (idempotent: skip if present; drop a redundant bare `<slug>` tag).
 
 ## Updating an existing install
 Changed a hook (e.g. the recall/push scripts)? Propagate it to every wired repo with **no manual copying** — `sync-hooks.sh` is idempotent (re-copies the current hooks, re-registers only if missing):

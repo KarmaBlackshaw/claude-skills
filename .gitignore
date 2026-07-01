@@ -18,3 +18,6 @@ mnt/
 # Local install artifacts
 *.bak
 *.tar.gz
+
+# Claude local memory pointer (machine-specific Obsidian paths)
+CLAUDE.local.md
