@@ -22,6 +22,7 @@ Bootstraps hub-and-spoke long-term memory into the **current repo**: a shared Ob
 | `<vault>/Learnings.md` | Global cross-repo hub **index** (MOC; created once, reused by every repo) |
 | `<vault>/Learnings/` | Atomic lesson notes, one `<slug>.md` per lesson (the hub path minus its extension) |
 | `<vault>/Projects/<repo>/<repo>.md` | This repo's session-log spoke — the **folder-note** (frontmatter-tagged `project/<repo>`); its sibling conventions note is `<repo> — Coding Rules.md` |
+| `<vault>/Projects/<repo>/<repo> — Threads.md` | This repo's **open-threads ledger** — durable follow-ups that survive session rotation (recall injects the `open` rows) |
 | `<vault>/.obsidian/graph.json` | Graph view config: tag nodes on + color groups (created once per vault, only if absent) |
 | `<repo>/CLAUDE.local.md` | **gitignored** — declares the vault paths (single source of truth) |
 | `<repo>/.claude/hooks/obsidian-recall.sh` | SessionStart → injects memory into context |
@@ -47,12 +48,14 @@ find "$HOME/Documents" "$HOME/Library/Mobile Documents" "$HOME" -maxdepth 4 -nam
 Store the chosen root as `VAULT`. Define paths (the spoke is a **folder-note**: same basename as its folder, so `[[<repo>]]` links resolve uniquely):
 - `ACTIVE="$VAULT/Projects/$NAME/$NAME.md"`
 - `RULES="$VAULT/Projects/$NAME/$NAME — Coding Rules.md"`
+- `THREADS="$VAULT/Projects/$NAME/$NAME — Threads.md"`
 - `LEARNINGS="$VAULT/Learnings.md"`
 
 ### 3. Create vault notes (NEVER overwrite existing)
 - Create `LEARNINGS` (the index) only if missing — use the **Learnings seed** below.
 - Create the atomic-notes folder: `mkdir -p "${LEARNINGS%.md}"` (i.e. `<vault>/Learnings/`). Individual lesson notes are written later by `/sync-brain push`.
 - Create `ACTIVE` only if missing (`mkdir -p "$VAULT/Projects/$NAME"`) — use the **Active Context seed** below, substituting `<repo>` and the project's stack. The seed's `tags: [project/<repo>]` frontmatter is what makes this project one labeled hub node in the graph (see **Graph project tag** below).
+- Create `THREADS` only if missing — use the **Threads-ledger seed** below (same `project/<repo>` tag). It starts as an empty table; `/sync-brain push` fills it.
 - **Seed the graph config** (per vault, once): if `"$VAULT/.obsidian/graph.json"` does not exist, copy `"$SKILL_DIR/assets/graph.json"` there. It turns on tag nodes and color-codes lessons / spokes / conventions / project facts. Never overwrite an existing one — the user may have tuned it.
 
 ### 4. Write the pointer (`CLAUDE.local.md`)
@@ -131,6 +134,20 @@ tags: [project/<repo>]
 <!-- Newer sessions above. When >5 entries, move the oldest's durable takeaways to [[Learnings]] and delete the stale summary. -->
 ```
 
+### Threads-ledger seed (`<vault>/Projects/<repo>/<repo> — Threads.md`)
+Durable open action items — where follow-ups outlive session rotation. Starts empty; `/sync-brain push` opens/closes rows. The `project/<repo>` tag keeps it on the graph with the rest of the spoke.
+```markdown
+---
+tags: [project/<repo>]
+---
+# Open Threads — <repo>
+
+> Durable follow-ups for this repo (survive session rotation). `/sync-brain push` logs new follow-ups here as `open` and flips resolved ones to `done`; the recall hook injects the `open` rows each session start.
+
+| status | thread | opened | source |
+|--------|--------|--------|--------|
+```
+
 ### Pointer seed (`<repo>/CLAUDE.local.md`)
 ```markdown
 # Persistent Memory & Self-Learning (LOCAL — gitignored, machine-specific)
@@ -150,6 +167,7 @@ tags: [project/<repo>]
 ACTIVE_CONTEXT=<ACTIVE path>
 LEARNINGS=<LEARNINGS path>
 CODING_RULES=<vault>/Projects/<repo>/<repo> — Coding Rules.md
+THREADS=<vault>/Projects/<repo>/<repo> — Threads.md
 -->
 ```
 

@@ -17,6 +17,7 @@ getpath() { grep -m1 "^$1=" "$PTR" 2>/dev/null | cut -d= -f2- || true; }
 LEARNINGS="$(getpath LEARNINGS)"
 RULES="$(getpath CODING_RULES)"
 ACTIVE="$(getpath ACTIVE_CONTEXT)"
+THREADS="$(getpath THREADS)"
 
 out=""
 if [ -n "$LEARNINGS" ] && [ -f "$LEARNINGS" ]; then
@@ -37,6 +38,14 @@ if [ -n "$RULES" ] && [ -f "$RULES" ]; then
 fi
 if [ -n "$ACTIVE" ] && [ -f "$ACTIVE" ]; then
   out+="# Active Context — this repo (Obsidian spoke)"$'\n\n'"$(cat "$ACTIVE")"$'\n'
+fi
+# Open threads: inject only the ledger's `open` rows — unfinished action items
+# that survived session rotation. Done rows stay out of context.
+if [ -n "$THREADS" ] && [ -f "$THREADS" ]; then
+  open_rows="$(grep -E '^\|[[:space:]]*open[[:space:]]*\|' "$THREADS" 2>/dev/null || true)"
+  if [ -n "$open_rows" ]; then
+    out+=$'\n'"# Open Threads — this repo (unfinished action items; close them or they carry forward)"$'\n\n'"| status | thread | opened | source |"$'\n'"|---|---|---|---|"$'\n'"$open_rows"$'\n'
+  fi
 fi
 
 [ -z "$out" ] && exit 0

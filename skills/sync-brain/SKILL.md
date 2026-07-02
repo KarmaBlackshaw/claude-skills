@@ -14,6 +14,7 @@ Hub-and-spoke long-term memory. The **hub** is a global `Learnings.md` in an Obs
 - `ACTIVE_CONTEXT=` → this repo's session log
 - `LEARNINGS=` → global cross-repo learnings
 - `CODING_RULES=` → conventions synced from `CLAUDE.md`
+- `THREADS=` → this repo's open-threads ledger (durable follow-ups; survives session rotation)
 
 ```bash
 grep -m1 '^ACTIVE_CONTEXT=' CLAUDE.local.md | cut -d= -f2-
@@ -36,10 +37,11 @@ Load memory into context so you start informed.
 The `obsidian-recall.sh` SessionStart hook already auto-pulls; use this for a manual mid-session refresh.
 
 ### `push`
-Persist this session's outcome. Default target is the **spoke** (`ACTIVE_CONTEXT`). The **hub** (`LEARNINGS`) is a small curated set — not a dump. Most sessions add nothing to it.
-1. Read the current `ACTIVE_CONTEXT`.
-2. Insert a new entry at the top of the Sessions list (newest first) using the **Session-End Template** below.
-3. **Rotation:** keep the last 5 session entries. When you drop an older one, run its takeaways through the Promotion gate before deleting.
+Persist this session's outcome. Default target is the **spoke** (`ACTIVE_CONTEXT`). The **hub** (`LEARNINGS`) is a small curated set — not a dump. Most sessions add nothing to it. Nothing important is lost on rotation because the two things worth keeping have durable homes: **learnings** graduate to the hub (gate below), and **follow-ups** land in the **THREADS ledger**.
+1. Read the current `ACTIVE_CONTEXT` and the `THREADS` ledger.
+2. Insert a new entry at the top of the Sessions list (newest first) using the **Session-End Template** below. If a Stop-hook checkpoint handed you a `<!-- session: <id> -->` marker, end the entry with that exact line — the checkpoint greps for it to verify the write landed (no marker → it nudges again).
+3. **Thread ledger — follow-ups survive rotation.** For every follow-up in the new entry, add an `open` row to the `THREADS` ledger; flip any thread you resolved this session to `done`. An open item then lives in the ledger independently of the session entry that spawned it, so dropping that entry later never loses it. The recall hook injects the ledger's `open` rows every session start.
+4. **Rotation:** keep the last 5 session entries. When you drop an older one, its follow-ups are already in the ledger (nothing to salvage) — only run its **Learnings** through the Promotion gate before deleting.
 
 **Promotion gate — most takeaways NEVER reach the hub.** Promote to `LEARNINGS` only if ALL hold:
 - **Reusable** beyond this one session — you'd genuinely apply it again.
@@ -56,7 +58,7 @@ A takeaway failing any gate stays in `ACTIVE_CONTEXT`. Stack-specific lessons (S
 
 **Soft cap.** If a section's index passes ~15–20 links or reads noisy, consolidate related notes into one sharper note (merge the bodies, delete the merged files, collapse their index lines).
 
-4. Write the spoke, the atomic note(s), and the hub index. Confirm exactly what you saved to the spoke and which notes you created or refined (if any).
+5. Write the spoke, the `THREADS` ledger, the atomic note(s), and the hub index. Confirm in one line exactly what you saved: the spoke entry, ledger rows opened/closed, and any notes created or refined.
 
 ## Session-End Template
 
@@ -66,7 +68,18 @@ A takeaway failing any gate stays in `ACTIVE_CONTEXT`. Stack-specific lessons (S
 - **Why:** <the reasoning / root cause, not just the what>
 - **Architecture:** <structural decisions or new patterns, if any>
 - **Learnings:** <optional — leave blank if none; only promote to [[Learnings]] via the push Promotion gate>
-- **Follow-ups:** <open threads for next session, if any>
+- **Follow-ups:** <open threads for next session, if any — each one also becomes an `open` row in the THREADS ledger>
+```
+
+## Threads-Ledger Template (`THREADS` — `<repo> — Threads.md`)
+
+Durable open action items — the one place follow-ups outlive session rotation. New follow-ups land as `open`; resolved ones flip to `done` (keep the row for history). The recall hook injects only the `open` rows each session start.
+
+```markdown
+| status | thread | opened | source |
+|--------|--------|--------|--------|
+| open | <short, actionable — what to do next> | YYYY-MM-DD | <session title or [[wikilink]]> |
+| done | <resolved item> | YYYY-MM-DD | <session title> |
 ```
 
 ## Atomic-Note Template (`<notes-dir>/<slug>.md`)

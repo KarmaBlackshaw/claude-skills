@@ -1,127 +1,153 @@
 # plan-and-build
 
-Two-phase workflow skill: **plan (opus) → approve → execute (sonnet/haiku/opus)**.
+Architect-orchestrated, spec-driven, **self-learning** frontend build pipeline:
+**recall → brainstorm → architect → (scaled gate) → builders → QA → retro**.
 
-Bundles one orchestration skill + four subagents that together implement a cost-aware feature pipeline. The planner uses opus for deep reasoning. The executor agents are routed per-step by complexity tag (`[low|med|high]` → haiku/sonnet/opus) so cheap mechanical work doesn't burn frontier-model tokens.
+Every non-trivial request first goes through a **scaled brainstorm** (design + approval), then
+an architect that dissects it, partitions the work into collision-free file sets, and writes one
+spec file per component. Builders (routed by complexity to haiku/sonnet/opus) build their owned
+files in parallel, **debugging to root cause** and claiming done only **with verification
+evidence**. QA always verifies with **two verdicts (spec + code-quality)**. A retro agent
+promotes what it learned to **Obsidian long-term memory** so the next run is smarter.
+
+Four superpowers-style disciplines are ported in, self-contained (no plugin dependency):
+skills-first, **design-before-build**, **root-cause debugging**, **evidence-before-claims**.
+Commit/finishing-branch is deliberately excluded — committing stays the user's call.
+
+No git worktrees — parallel safety comes from the architect giving each builder a
+**disjoint** set of files.
 
 ## What's inside
 
 ```
 plan-and-build/
-├── SKILL.md              # orchestrator — Phase 1/2/3 logic + routing
-├── README.md             # you are here
+├── SKILL.md               # orchestrator — the 7-phase loop + dispatch templates
+├── README.md              # you are here
+├── using-skills.md        # ported: skill-discovery discipline
+├── brainstorming.md       # ported: design-before-build (scaled), Phase 1
+├── systematic-debugging.md# ported: root cause before any fix, Phases 4–5
+├── verifying.md           # ported: no completion claim without fresh evidence
+├── lessons.md             # legacy local memory + write fallback (memory is Obsidian now)
+├── spec-template.md       # the per-component spec the architect fills
 └── agents/
-    ├── planner.md        # opus — writes plan via superpowers:writing-plans
-    ├── executor.md       # sonnet — default executor for [med] steps
-    ├── executor-haiku.md # haiku — mechanical [low] steps
-    └── executor-opus.md  # opus — hard [high] steps
+    ├── pb-architect.md  # opus — consume design + partition + write specs (read-only on source)
+    ├── executor.md      # sonnet — build [med] owned files
+    ├── executor-haiku.md# haiku  — build [low] owned files
+    ├── executor-opus.md # opus   — build [high] owned files
+    ├── qa-reviewer.md   # sonnet — verify diff vs spec + code-quality + conventions (2 verdicts)
+    └── retro.md         # sonnet — promote generalizable lessons to Obsidian (sync-brain gate)
 ```
 
-The skill is the entry point. Subagents are dispatched by the orchestrator based on the plan's complexity tags.
+> Claude Code dispatches agents from `~/.claude/agents/*.md` (flat, no subdirs). The
+> `agents/` folder here is the bundled/portable copy. **Run `./sync.sh` after editing any
+> agent or skill file** — it installs the skill into `~/.claude/skills/` and registers all
+> agents into `~/.claude/agents/`, so the two copies can't silently drift (`./sync.sh --check`
+> reports drift without writing).
+>
+> The spec-writer is named **`pb-architect`** (not `architect`) on purpose: the `architect`
+> name is owned by the standalone jeash orchestrator agent (delegates teammates). Renaming
+> here keeps the two from colliding in the flat `~/.claude/agents/` namespace.
 
-## How it works
+## The loop
 
 ```
-user: "implement <feature>"
+user: "implement / build / fix / refactor <X>"
    │
-   ▼
-plan-and-build skill triggers
-   │
-   ├── Phase 1: Plan
-   │     dispatch planner (opus)
-   │     planner invokes superpowers:writing-plans
-   │     → returns plan markdown w/ [low|med|high] tags per step
-   │     orchestrator writes plan to .claude/plans/<slug>-<date>.md
-   │
-   ├── Phase 2: Approval gate (HARD STOP)
-   │     show plan to user
-   │     wait for "go" / "approve" / edits
-   │
-   └── Phase 3: Execute (model-routed)
-         group consecutive same-tag steps into batches
-         dispatch:
-           [low]  → executor-haiku  (cheap, mechanical)
-           [med]  → executor        (sonnet, default)
-           [high] → executor-opus   (deep reasoning)
-         escalate on failure: haiku → sonnet → opus → halt
-         relay per-step results to user
-         summarize files changed + lint output
-         ASK before any git op
+   ├── Phase 0  Recall      read disciplines + Obsidian memory → inject into every prompt
+   ├── Phase 1  Brainstorm  scaled: trivial → 1-line design; non-trivial → design + approval
+   ├── Phase 2  Architect   dissect, partition files, write docs/research/components/*.spec.md
+   │                         → dispatch plan (builder|spec|owned files|tag|wave|depends-on)
+   ├── Phase 3  Scaled gate  single simple builder → auto-proceed
+   │                         multi-component / any [high] → wait for "go"
+   ├── Phase 4  Build        waves: parallel within (disjoint files), sequential across
+   │                         route [low|med|high] → haiku/sonnet/opus; spec + disciplines inline
+   │                         root cause before fix · no ✅ without quoted verify output
+   ├── Phase 5  QA           tiered: 1 qa-reviewer (simple) or 1-per-component (complex)
+   │                         two verdicts (spec + code-quality); blockers routed back to builder
+   └── Phase 6  Retro        distill generalizable lessons → promote to Obsidian hub
 ```
+
+## Project-agnostic
+
+The skill hardcodes no framework or house conventions. The architect **discovers** each
+project's conventions at runtime — its `CLAUDE.md` / `AGENTS.md`, lint config, existing
+patterns, and typecheck/lint/build commands — and encodes those into each spec. Run it in
+any frontend repo and it adapts; run it in a repo with strict rules and it picks them up
+from that repo.
+
+## Self-learning (Obsidian memory)
+
+The skill's long-term memory is the **Obsidian hub-and-spoke vault**, shared across repos.
+Generalizable, cross-project lessons are promoted to the **hub** (`LEARNINGS`) as curated
+atomic notes via the `sync-brain` Promotion gate at Phase 6; run summaries go to this repo's
+**spoke** (`ACTIVE_CONTEXT`). Paths are resolved from the gitignored `CLAUDE.local.md` — never
+hardcoded — and injected at Phase 0 (usually by the `obsidian-recall.sh` SessionStart hook).
+
+If a repo isn't wired to a vault, Phase 0 asks for the vault path or offers to run
+`/setup-obsidian-memory`. The skill-local `lessons.md` is **legacy local memory** (still read at
+Phase 0 so nothing is stranded) and the **write fallback** when no vault is configured.
+
+**Required companions:** `sync-brain` (runtime read/write) and `setup-obsidian-memory` (wiring).
+
+## Skill discovery (no plugin dependency)
+
+`using-skills.md` is a self-contained port of the "invoke relevant skills before acting"
+discipline. The orchestrator and agents follow it without depending on any external plugin.
+It deliberately carries **no auto-commit behavior** — committing stays the user's call.
 
 ## Why this exists
 
-Default Claude Code workflow runs everything on whatever model the tab is set to. For multi-step features, that's wasteful — you don't need opus to add a CRUD route, but you do want it for the architecture call. This skill fixes that:
-
-- **Planner stays on opus** — bad plan poisons execution, worth the spend
-- **Executor model is per-step**, not per-task
-- **Approval gate** — humans review the plan before any code writes
-- **No auto-commit** — `superpowers:executing-plans` commits eagerly; this skill does not. User commits when they're ready.
-- **No test files** — workflow is for shipping the change, not building a test suite. Verification = build, lint, typecheck, manual run.
-
-Cost example, 10-step plan:
-- Without routing: 10 sonnet exec runs
-- With routing (6 low + 3 med + 1 high): 1 haiku batch + 1 sonnet batch + 1 opus run
-- ~50–60% cheaper at typical price ratios
-
-## Install
-
-Via the repo install script (installs the skill + all four bundled agents):
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/KarmaBlackshaw/claude-skills/main/install.sh | bash -s plan-and-build
-```
-
-Restart Claude Code fully after install (Cmd+Q, not just close window).
+- **Architect on opus** — a bad decomposition poisons everything downstream.
+- **Collision-free parallelism without worktrees** — file partitioning, not branches.
+- **Spec per component** — auditable artifact; builders never guess from a half-remembered prompt.
+- **Builder model is per-component**, routed by complexity tag — cheap work stays cheap.
+- **QA always runs**; **Retro always runs** — the pipeline compounds knowledge over time.
+- **Superpowers disciplines, ported in** — design-before-build, root-cause debugging, and evidence-before-claims raise quality without depending on the superpowers plugin.
+- **No auto-commit, no test files** — ship the change; the human commits when ready.
 
 ## Trigger phrases
 
-The skill auto-fires on:
-- "implement X", "build X", "add X", "create X"
-- "refactor X"
-- "plan and build", "feature workflow"
+Auto-fires on: "implement X", "build X", "add X", "create X", "fix X", "refactor X",
+"plan and build". Or invoke explicitly: `use plan-and-build to <task>`.
 
-Or invoke explicitly: `use plan-and-build to <task>`.
+## Hard rules (baked into every agent)
 
-## Hard rules
-
-These are baked into every agent in this bundle. They override anything any subskill might suggest:
-
-- **NO `git commit` / `git push` / `gh pr create`** without explicit user instruction in the current dispatch
-- **NO test file writes** — no `*.test.*`, `*.spec.*`, `__tests__/`
-- **NO `superpowers:executing-plans`** — it auto-commits
-- **NO `superpowers:test-driven-development`** — workflow doesn't write tests
-- **NO improvising** when plan is wrong — halt and surface to user
+- **NO** `git commit` / `git push` / `gh pr create` without explicit user instruction. (Finishing-a-branch / commit is the one superpowers piece deliberately excluded.)
+- **NO** test file writes (`*.test.*`, `*.spec.*`, `__tests__/`). Debugging may use a throwaway repro, deleted after — never committed. Verification is build/lint/typecheck/manual.
+- **NO** build of non-trivial work without a design + approval first (brainstorm gate).
+- **NO** "done / passing / fixed" claim from any layer without fresh, quoted verification evidence.
+- **NO** symptom-patching — any verify failure / QA blocker is debugged to root cause first.
+- **NO** builder without its spec file in `docs/research/components/`.
+- **NO** two parallel builders editing the same file — partition or sequence.
+- **NO** improvising when the spec is wrong — halt and surface.
+- **NO** hardcoded vault paths — memory paths come from `CLAUDE.local.md`.
 
 ## Complexity tag heuristics
 
-The planner classifies each step:
-
 | Tag | Use for | Examples |
 |-----|---------|----------|
-| `[low]` | Mechanical, single-file, predictable | rename symbol, copy boilerplate, add a route from template, doc edit |
-| `[med]` | Typical feature work, framework idioms | multi-file CRUD, business logic, store/composable wiring, validators |
-| `[high]` | Hard reasoning, perf, security, subtle bugs | algorithms, concurrency, cross-cutting refactor, race conditions, auth/crypto code |
+| `[low]` | Mechanical, single-file, predictable | rename, copy boilerplate, route from template, doc edit |
+| `[med]` | Typical feature work, framework idioms | multi-file CRUD, store/composable wiring, validators |
+| `[high]` | Hard reasoning, perf, security, subtle bugs | algorithms, cross-cutting refactor, race conditions, auth |
 
-Misclassification is caught by the escalation chain — a haiku that hits `❌ blocked` is retried on sonnet, then opus.
+Misclassification is caught by the escalation chain — a blocked haiku retries on sonnet, then opus.
 
-## Adapting to your stack
+## Install / sync
 
-Skill is stack-agnostic. Subagents pick up project conventions via `ctx_read`/`ctx_search` against the repo. If you want stricter behavior for a specific framework, layer a project-level skill on top (e.g. `vue-best-practices` will activate for Vue work and the executor will follow it).
+`sync.sh` is the single command to install or update the skill on a machine. It copies the
+skill dir into `~/.claude/skills/plan-and-build` and registers every `agents/*.md` into the
+flat `~/.claude/agents/` dir Claude Code dispatches from — idempotent, safe to re-run.
 
-## Files
+```
+./sync.sh          # install / update skill + register agents
+./sync.sh --check  # report drift only (no writes); exit 1 if out of sync
+```
 
-- [`SKILL.md`](./SKILL.md) — orchestrator logic, dispatch templates, routing pseudocode
-- [`agents/planner.md`](./agents/planner.md) — opus planner spec
-- [`agents/executor.md`](./agents/executor.md) — sonnet executor spec
-- [`agents/executor-haiku.md`](./agents/executor-haiku.md) — haiku executor spec
-- [`agents/executor-opus.md`](./agents/executor-opus.md) — opus executor spec
+The **repo copy is the source of truth**; run `sync.sh` from it to propagate any edit. It
+overwrites only this skill's own agents (never `--delete`s others in `~/.claude/agents/`).
 
-## Future agents
+## Extending
 
-To extend the pipeline, drop new agent definitions in `agents/`. Naming conventions:
-
-- `<role>.md` for the default-model variant (e.g. `reviewer.md` runs on whatever model its frontmatter says)
-- `<role>-<model>.md` for model-specific variants (e.g. `reviewer-opus.md`)
-
-Update `SKILL.md`'s routing table when adding a new role. Agent files must be flat under `agents/` — Claude Code reads them from `~/.claude/agents/*.md` (no subdirs).
+Drop a new agent in `agents/`, add a row to SKILL.md's agent table, wire it into the relevant
+phase, then run `./sync.sh` to register it. Naming: `<role>.md` for the default-model variant,
+`<role>-<model>.md` for model-specific variants.
