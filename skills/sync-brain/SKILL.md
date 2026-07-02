@@ -5,7 +5,7 @@ description: Pull or push long-term memory between the current repo and a centra
 
 # sync-brain
 
-Hub-and-spoke long-term memory. The **hub** is a global `Learnings.md` in an Obsidian vault; each repo is a **spoke** with its own `Active Context.md` session log. This skill moves context between the current repo and the vault.
+Hub-and-spoke long-term memory. The **hub** is a global `Learnings.md` in an Obsidian vault; each repo is a **spoke** — a folder-note `Projects/<repo>/<repo>.md` session log (conventions sit in the sibling `<repo> — Coding Rules.md`). Always resolve the spoke path from `ACTIVE_CONTEXT` in `CLAUDE.local.md`, never by hardcoded filename. This skill moves context between the current repo and the vault.
 
 ## Path discovery (do this first, every time)
 
@@ -88,6 +88,6 @@ Source: [[Active Context]] · <repo> · YYYY-MM-DD
 - Summarize only what actually happened this session — never invent entries.
 - Use the real current date.
 - Promotion to the hub is the exception, not the default — most sessions add nothing to `Learnings.md`.
-- Keep `Active Context.md` lean; keep `Learnings.md` small and curated — refine existing entries over appending new ones.
+- Keep the spoke (`<repo>.md`, resolved from `ACTIVE_CONTEXT`) lean; keep `Learnings.md` small and curated — refine existing entries over appending new ones.
 - Pass file content through unchanged except for the edits above — in particular, preserve the spoke's `tags: [project/<repo>]` frontmatter (it's the note's graph hub label; see setup-obsidian-memory → **Graph project tag**).
 - Global atomic lesson notes stay tagged `[learning, …]` only — never add a `project/<repo>` tag; they're cross-repo and hub to `[[Learnings]]`.

@@ -7,10 +7,34 @@
   "showOrphans": true,
   "collapse-color-groups": false,
   "colorGroups": [
-    { "query": "path:\"Learnings/\"", "color": { "a": 1, "rgb": 9141494 } },
-    { "query": "file:\"Active Context\"", "color": { "a": 1, "rgb": 15771709 } },
-    { "query": "file:\"Coding Rules\"", "color": { "a": 1, "rgb": 6333946 } },
-    { "query": "path:Memory", "color": { "a": 1, "rgb": 4906624 } }
+    {
+      "query": "path:\"Learnings/\"",
+      "color": {
+        "a": 1,
+        "rgb": 9141494
+      }
+    },
+    {
+      "query": "path:\"Projects/\" -file:\"Coding Rules\" -path:Memory",
+      "color": {
+        "a": 1,
+        "rgb": 15771709
+      }
+    },
+    {
+      "query": "file:\"Coding Rules\"",
+      "color": {
+        "a": 1,
+        "rgb": 6333946
+      }
+    },
+    {
+      "query": "path:Memory",
+      "color": {
+        "a": 1,
+        "rgb": 4906624
+      }
+    }
   ],
   "collapse-display": true,
   "showArrow": false,

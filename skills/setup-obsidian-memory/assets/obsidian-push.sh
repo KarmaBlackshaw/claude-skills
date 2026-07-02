@@ -13,6 +13,13 @@ fi
 ROOT="${CLAUDE_PROJECT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 [ -f "$ROOT/CLAUDE.local.md" ] || exit 0
 
+# Quiet-gate: if this repo's spoke already has an entry dated today, the session
+# was already persisted — stay silent instead of re-nagging on every Stop.
+ACTIVE="$(grep -m1 '^ACTIVE_CONTEXT=' "$ROOT/CLAUDE.local.md" 2>/dev/null | cut -d= -f2- || true)"
+if [ -n "$ACTIVE" ] && [ -f "$ACTIVE" ] && grep -q "^### $(date +%F)" "$ACTIVE" 2>/dev/null; then
+  exit 0
+fi
+
 read -r -d '' reason <<'EOF' || true
 Obsidian memory checkpoint (Stop hook). Review ONLY this session. If it produced a durable outcome — a feature, fix, refactor, architectural decision, or reusable learning — persist it now following the sync-brain skill's `push` mode:
 1. Read the ACTIVE_CONTEXT and LEARNINGS paths from CLAUDE.local.md.

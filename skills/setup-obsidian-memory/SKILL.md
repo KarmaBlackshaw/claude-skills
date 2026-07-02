@@ -21,7 +21,7 @@ Bootstraps hub-and-spoke long-term memory into the **current repo**: a shared Ob
 |---|---|
 | `<vault>/Learnings.md` | Global cross-repo hub **index** (MOC; created once, reused by every repo) |
 | `<vault>/Learnings/` | Atomic lesson notes, one `<slug>.md` per lesson (the hub path minus its extension) |
-| `<vault>/Projects/<repo>/Active Context.md` | This repo's session-log spoke (frontmatter-tagged `project/<repo>`) |
+| `<vault>/Projects/<repo>/<repo>.md` | This repo's session-log spoke — the **folder-note** (frontmatter-tagged `project/<repo>`); its sibling conventions note is `<repo> — Coding Rules.md` |
 | `<vault>/.obsidian/graph.json` | Graph view config: tag nodes on + color groups (created once per vault, only if absent) |
 | `<repo>/CLAUDE.local.md` | **gitignored** — declares the vault paths (single source of truth) |
 | `<repo>/.claude/hooks/obsidian-recall.sh` | SessionStart → injects memory into context |
@@ -44,8 +44,9 @@ Detect candidate Obsidian vaults (folders containing `.obsidian/`), then confirm
 ```bash
 find "$HOME/Documents" "$HOME/Library/Mobile Documents" "$HOME" -maxdepth 4 -name .obsidian -type d 2>/dev/null | sed 's:/\.obsidian::'
 ```
-Store the chosen root as `VAULT`. Define paths:
-- `ACTIVE="$VAULT/Projects/$NAME/Active Context.md"`
+Store the chosen root as `VAULT`. Define paths (the spoke is a **folder-note**: same basename as its folder, so `[[<repo>]]` links resolve uniquely):
+- `ACTIVE="$VAULT/Projects/$NAME/$NAME.md"`
+- `RULES="$VAULT/Projects/$NAME/$NAME — Coding Rules.md"`
 - `LEARNINGS="$VAULT/Learnings.md"`
 
 ### 3. Create vault notes (NEVER overwrite existing)
@@ -109,7 +110,7 @@ Then tell the user: **fully restart Claude Code** (quit, not just close the wind
 <!-- Index only: each lesson is an atomic note at Learnings/<slug>.md; keep one dated one-line link here per lesson. Refine the existing note before adding a new one. -->
 ```
 
-### Active Context seed (`<vault>/Projects/<repo>/Active Context.md`)
+### Active Context seed (`<vault>/Projects/<repo>/<repo>.md` — the folder-note spoke)
 The `project/<repo>` tag is load-bearing — do not drop it (see **Graph project tag**).
 ```markdown
 ---
@@ -148,12 +149,12 @@ tags: [project/<repo>]
 <!-- sync-brain paths (machine-readable — scripts grep these KEY=value lines; do not rename keys)
 ACTIVE_CONTEXT=<ACTIVE path>
 LEARNINGS=<LEARNINGS path>
-CODING_RULES=<vault>/Projects/<repo>/Coding Rules.md
+CODING_RULES=<vault>/Projects/<repo>/<repo> — Coding Rules.md
 -->
 ```
 
 ## Graph project tag
-The Obsidian graph can't label edges, and every project's spoke is named `Active Context.md`, so without tags the graph is N identical unlabeled nodes. Fix: every note under `Projects/<repo>/` (the spoke, `Coding Rules.md`, `Memory.md` + `Memory/*`) carries a nested `project/<repo>` frontmatter tag. With `showTags` on, that tag becomes one labeled hub node per project and its facts orbit it. Global `Learnings/` notes stay **untagged by project on purpose** — they're cross-repo and hub to `[[Learnings]]`. The seeded `graph.json` color-codes the four categories (lessons / spokes / conventions / project facts). To back-fill tags on an already-populated vault, add `project/<slug>` to each note's `tags:` (idempotent: skip if present; drop a redundant bare `<slug>` tag).
+The Obsidian graph can't label edges. Spokes are **folder-notes** (`Projects/<repo>/<repo>.md`) so each is uniquely named + labeled, and `[[<repo>]]` links resolve without ambiguity. On top of that, every note under `Projects/<repo>/` (the spoke `<repo>.md`, `<repo> — Coding Rules.md`, `Memory.md` + `Memory/*`) carries a nested `project/<repo>` frontmatter tag: with `showTags` on that tag becomes one hub node per project and its facts orbit it. Global `Learnings/` notes stay **untagged by project on purpose** — they're cross-repo and hub to `[[Learnings]]`. The seeded `graph.json` color-codes four categories: lessons (`path:"Learnings/"`), **spokes** (`path:"Projects/" -file:"Coding Rules" -path:Memory` — folder-notes share no filename token, so match by path minus the other two), conventions (`file:"Coding Rules"`), project facts (`path:Memory`). To back-fill tags on an already-populated vault, add `project/<slug>` to each note's `tags:` (idempotent: skip if present; drop a redundant bare `<slug>` tag).
 
 ## Updating an existing install
 Changed a hook (e.g. the recall/push scripts)? Propagate it to every wired repo with **no manual copying** — `sync-hooks.sh` is idempotent (re-copies the current hooks, re-registers only if missing):
@@ -163,6 +164,22 @@ for repo in <wired-repo-roots…>; do
 done
 ```
 Find wired repos with `find <dir> -maxdepth 2 -name CLAUDE.local.md`. Settings never need hand-editing: registration lives in the per-machine, gitignored `settings.local.json` and is handled by the script; the committed `settings.json` is intentionally left untouched so the memory hooks are never forced on teammates who clone the repo.
+
+## Maintenance
+
+Two read-mostly helpers in `assets/` keep a wired vault healthy.
+
+### `memory-doctor.sh <vault-root> [--repo <path> …]`
+Audits a hub vault (the dir with `Learnings.md`). Read-only. Prints four sections and exits `1` if it finds **actionable** issues (broken links / orphans), else `0`:
+1. **Broken wikilinks** — `[[target]]` (handles `|alias`/`#heading`) that resolves to no note anywhere in the vault. Illustrative prose tokens (`wikilink`, `slug`, `name`…) are denylisted.
+2. **Stale notes** — `Learnings/*.md` whose `updated:` is older than 6 months (or missing). Advisory.
+3. **Orphans** — a note file with no index line, or an index link with no note file. Actionable.
+4. **Dead file refs** — backticked `path/to.ext` tokens in notes; pass `--repo <path>` (repeatable) to resolve them against real repos, else they're just listed to eyeball. Advisory.
+
+Run it after a migration or every so often; fix broken links + orphans, review the advisories.
+
+### `migrate-native-memory.sh <repo-root> [--source inrepo|native|<dir>]`
+Mechanically folds a repo's native memory store into its Obsidian spoke (routes by `type:`/filename-prefix: `feedback_`/`rules_` → Coding Rules, `reference_` → Coding Rules `### Reference`, `project_` → Active Context Standing Notes above `## Sessions`). **Idempotent** (dedupes by heading), **never deletes the source**, and prints anything it can't classify under `NEEDS MANUAL PLACEMENT`. Source default `inrepo` = `<repo>/.claude/memory`; `native` = `~/.claude/projects/<slug>/memory`. It does the ~80% mechanical mapping — judgment-heavy dedup/promotion still belongs to `/sync-brain push`.
 
 ## Common mistakes
 | Mistake | Fix |
