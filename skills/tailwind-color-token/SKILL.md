@@ -20,12 +20,9 @@ Search `tailwind.config.js` (or `tailwind.config.ts`) at the repo root. Look in 
 
 Use `AskUserQuestion` — one question per unique hex (batch if multiple new hexes in the same edit). Show the hex value and suggest a name.
 
-Example prompt: *"What should `#1A73E8` be named in the Tailwind config?"*
+Look up the hex on [color-name.com](https://www.color-name.com/hex/1A73E8) (replace the hex in the URL) and use the **exact color name it returns**, camelCased. E.g. `#1A73E8` → "Tampa" → `tampa`. Do not invent descriptive or semantic names (`googleBlue`, `errorRed`) — the token name is whatever color-name.com calls that hex.
 
-Suggested name rules:
-- camelCase
-- Descriptive: prefer color name (`googleBlue`, `navyDark`) or semantic role (`errorRed`, `brandPrimary`)
-- Check [color-name.com](https://www.color-name.com/hex) mentally if you recognize the hue
+Example prompt: *"color-name.com calls `#1A73E8` \"Tampa\" — register it as `tampa`?"*
 
 ### 3. Add token to tailwind.config.js
 
@@ -33,7 +30,7 @@ Add the new entry at the **top level** of `theme.extend.colors` (not inside `cus
 
 ```js
 // theme.extend.colors
-myColorName: "#1A73E8",
+tampa: "#1A73E8",
 ```
 
 Use the Write or Edit tool to insert it. Keep entries alphabetically sorted within their group if the existing list is sorted; otherwise append.
@@ -44,9 +41,9 @@ Swap the raw hex for the token:
 
 | Before | After |
 |--------|-------|
-| `bg-[#1A73E8]` | `bg-googleBlue` |
-| `text-[#1A73E8]` | `text-googleBlue` |
-| `border-[#1A73E8]` | `border-googleBlue` |
+| `bg-[#1A73E8]` | `bg-tampa` |
+| `text-[#1A73E8]` | `text-tampa` |
+| `border-[#1A73E8]` | `border-tampa` |
 | `color: '#1A73E8'` (inline style) | `color: '#1A73E8'` ← keep if Tailwind class isn't applicable, but token is still registered |
 
 ## Rules
