@@ -39,10 +39,10 @@ plan-and-build/
 ```
 
 > Claude Code dispatches agents from `~/.claude/agents/*.md` (flat, no subdirs). The
-> `agents/` folder here is the bundled/portable copy. **Run `./sync.sh` after editing any
-> agent or skill file** — it installs the skill into `~/.claude/skills/` and registers all
-> agents into `~/.claude/agents/`, so the two copies can't silently drift (`./sync.sh --check`
-> reports drift without writing).
+> `agents/` folder here is the bundled/portable copy. **Run the repo-root `./sync.sh` after
+> editing any agent or skill file** — it installs every skill into `~/.claude/skills/` and
+> registers all agents into `~/.claude/agents/`, so the two copies can't silently drift
+> (`./sync.sh --check` reports drift without writing).
 >
 > The spec-writer is named **`pb-architect`** (not `architect`) on purpose: the `architect`
 > name is owned by the standalone jeash orchestrator agent (delegates teammates). Renaming
@@ -134,20 +134,23 @@ Misclassification is caught by the escalation chain — a blocked haiku retries 
 
 ## Install / sync
 
-`sync.sh` is the single command to install or update the skill on a machine. It copies the
-skill dir into `~/.claude/skills/plan-and-build` and registers every `agents/*.md` into the
-flat `~/.claude/agents/` dir Claude Code dispatches from — idempotent, safe to re-run.
+The **repo-root `sync.sh`** is the single command to install or update *every* skill in this
+repo (incl. plan-and-build) plus their agents on a machine — idempotent, safe to re-run. It
+mirrors each `skills/<name>/` into `~/.claude/skills/<name>` and registers every `agents/*.md`
+into the flat `~/.claude/agents/` dir Claude Code dispatches from, then offers to wire the
+Obsidian memory hooks into repos you pick.
 
 ```
-./sync.sh          # install / update skill + register agents
-./sync.sh --check  # report drift only (no writes); exit 1 if out of sync
+../../sync.sh                # install / update ALL skills + agents, then pick repos for hooks
+../../sync.sh --skills-only  # skills + agents only, skip hook wiring
+../../sync.sh --check        # report drift only (no writes); exit 1 if out of sync
 ```
 
 The **repo copy is the source of truth**; run `sync.sh` from it to propagate any edit. It
-overwrites only this skill's own agents (never `--delete`s others in `~/.claude/agents/`).
+overwrites only each skill's own agents (never `--delete`s others in `~/.claude/agents/`).
 
 ## Extending
 
 Drop a new agent in `agents/`, add a row to SKILL.md's agent table, wire it into the relevant
-phase, then run `./sync.sh` to register it. Naming: `<role>.md` for the default-model variant,
-`<role>-<model>.md` for model-specific variants.
+phase, then run the repo-root `./sync.sh` to register it. Naming: `<role>.md` for the
+default-model variant, `<role>-<model>.md` for model-specific variants.
