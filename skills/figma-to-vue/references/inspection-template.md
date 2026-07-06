@@ -7,7 +7,8 @@ Use this exact structure for the step 1 output. Keep it scannable — the user w
 ```markdown
 ## Step 1: Inspection
 
-**Frame:** [Figma frame name]
+**Frames in file:** [all top-level frames]
+**In scope:** [chosen frame(s)] — widths [e.g. 375, 1440] (these are the step-5 match targets)
 **Node ID:** [id]
 
 ### 1. Component hierarchy
@@ -57,12 +58,33 @@ Use this exact structure for the step 1 output. Keep it scannable — the user w
 
 **Off-grid spacing: 1 value** — will flag in mapping.
 
+### 6. Layout sizing
+
+| Node | Width mode | Height mode | Fixed dims | Notes |
+|------|-----------|-------------|-----------|-------|
+| RootContainer | fill | hug | — | **full-bleed** (fills viewport, no max-width) |
+| Header | fill | hug | — | |
+| Table col: Name | fixed | — | 240px | |
+| Table col: Status | fixed | — | 120px | |
+
+**Container: full-bleed** — do NOT wrap in a centered `max-w-*` at build time. Width modes and fixed dims above are measured from Figma, never eyeballed.
+
+### 7. Assets to export
+
+| Node | Type | Export as | Node ID |
+|------|------|-----------|---------|
+| logo | Vector | SVG | 12:34 |
+| hero-photo | Image fill | PNG @2x | 12:40 |
+
+**Assets: 2** — exported via `download_assets` in step 4, not rebuilt or placeholdered.
+
 ### Summary
 
 - Nodes: 6 (1 Component, 1 Instance, 3 Frames, 2 Text, 1 Vector)
 - Unbound colors: 1
 - Unbound text styles: 1
 - Off-grid spacing: 1
+- Assets to export: 2
 - Mapping recommendation: [clean / needs-tokens / needs-designer-fix]
 ```
 
@@ -74,10 +96,10 @@ Use this exact structure for the step 1 output. Keep it scannable — the user w
 
 ## What to do with Figma MCP responses
 
-The Figma MCP typically returns node data with fields like `fills`, `strokes`, `layoutMode`, `itemSpacing`, `paddingTop/Right/Bottom/Left`, `boundVariables`, and `styles`.
+Sources per section: `get_metadata` → section 1 (tree). `get_design_context` → sections 2, 5, 6 (`fills`, `strokes`, `layoutMode`, `itemSpacing`, `paddingTop/Right/Bottom/Left`, `styles`, `layoutSizingHorizontal` / `layoutSizingVertical` = `FILL` / `HUG` / `FIXED`, `width` / `height`, `absoluteBoundingBox`). `get_variable_defs` → sections 3, 4 (the authoritative bound-variable list). `download_assets` → section 7 exports.
 
-- A color is **bound** when `boundVariables.fills[0]` exists and resolves to a variable name.
-- A text style is **bound** when `styles.text` is set (Figma text style ID) — resolve it to the style name.
-- If the MCP returns raw hex in `fills[0].color` without a `boundVariables` entry, it's unbound.
+- Prefer `get_variable_defs` to decide bound vs unbound: a color/text style is **bound** when it appears there as a named variable.
+- Fallback from node data: a color is bound when `boundVariables.fills[0]` resolves to a variable name; a text style is bound when `styles.text` is set — resolve it to the style name.
+- Raw hex in `fills[0].color` with no matching variable is **unbound**.
 
 Do not treat "color is defined in a local style but not published" as bound — for the purposes of this skill, only variables and published styles count as bound. Local styles still require a token proposal.

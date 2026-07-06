@@ -15,7 +15,7 @@ This skill replaces guessing with inspection. Every step produces a structured a
 
 ## How it works
 
-A 4-step workflow, enforced by the skill:
+A 5-step workflow, enforced by the skill:
 
 ```
 1. Inspect  → Pull frame structure via Figma MCP. Report hierarchy, 
@@ -25,9 +25,11 @@ A 4-step workflow, enforced by the skill:
 3. Outline  → Propose component structure, props, emits. STOP for approval.
 4. Build    → Detect Vue 2 vs 3, load matching conventions, generate SFCs.
               Run linter and typecheck. Report diffs.
+5. Match    → Screenshot each rendered page via Playwright MCP, compare to
+              the Figma image, fix, repeat until matched (cap 10/page).
 ```
 
-Step 3 pauses for explicit approval — structure mistakes are the most expensive to fix after the code is written.
+Step 3 pauses for explicit approval — structure mistakes are the most expensive to fix after the code is written. Step 5 loops on real pixels: it never emits arbitrary Tailwind values to force a match and stops early when a diff stops closing.
 
 ## Install
 
@@ -37,6 +39,7 @@ Step 3 pauses for explicit approval — structure mistakes are the most expensiv
 - `git` and `curl` available on `PATH`
 - A Vue + Tailwind project to use the skill in (see [Requirements](#requirements) below)
 - [Figma MCP connector](https://help.figma.com/hc/en-us/articles/32132100833559) configured in Claude Code
+- [Playwright MCP](https://github.com/microsoft/playwright-mcp) configured in Claude Code (required for Step 5, the visual match loop)
 
 ### Recommended: one-liner install
 

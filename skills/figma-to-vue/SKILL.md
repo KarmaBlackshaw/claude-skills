@@ -1,11 +1,11 @@
 ---
 name: figma-to-vue
-description: Convert Figma designs into Vue (2 or 3) + Tailwind CSS components with structural accuracy and design system fidelity. Use this skill whenever the user pastes a Figma URL, mentions "figma", asks to "build from figma", "implement this design", "match this mockup", or references a Figma frame, component, or design file — even if they don't explicitly ask for the skill. Also use when the user asks to inspect, audit, or map a Figma file to their Vue codebase, or asks how to match a Figma design in code. The skill auto-detects the project's Vue version (2.x, 2.7, or 3.x) and adapts conventions accordingly. It enforces a 4-step workflow (inspect → map → outline → build) that prevents the common failure modes of guessing hex codes, rounding spacing, and misreading component hierarchy.
+description: Convert Figma designs into Vue (2 or 3) + Tailwind CSS components with structural accuracy and design system fidelity. Use this skill whenever the user pastes a Figma URL, mentions "figma", asks to "build from figma", "implement this design", "match this mockup", or references a Figma frame, component, or design file — even if they don't explicitly ask for the skill. Also use when the user asks to inspect, audit, or map a Figma file to their Vue codebase, or asks how to match a Figma design in code. The skill auto-detects the project's Vue version (2.x, 2.7, or 3.x) and adapts conventions accordingly. It enforces a 5-step workflow (inspect → map → outline → build → visual-match) that prevents the common failure modes of guessing hex codes, rounding spacing, and misreading component hierarchy. The final step drives a Playwright screenshot loop that compares each rendered page against the Figma image and iterates until they match.
 ---
 
 # Figma to Vue
 
-A deterministic 4-step workflow for converting Figma designs into Vue 3 + Tailwind components without guessing.
+A deterministic 5-step workflow for converting Figma designs into Vue 3 + Tailwind components without guessing.
 
 ## Why this workflow exists
 
@@ -17,19 +17,38 @@ This skill replaces guessing with inspection. Each step produces a structured ar
 
 Before starting, verify:
 
-1. **Figma MCP connector is available.** Check for a Figma-related tool in the tool list. If not available, stop and tell the user to connect the Figma MCP before continuing. Do not proceed by asking the user to paste screenshots — that's a different workflow.
+1. **Figma MCP connector is available.** Confirm these tools are in the tool list (names may be prefixed, e.g. `mcp__figma__get_metadata`):
+
+   | Tool | Use | Step |
+   |------|-----|------|
+   | `get_metadata` | cheap node tree / structure — call **first** for hierarchy and node IDs | 1 |
+   | `get_design_context` | full node data (layout, spacing, fills, variants) — call **after** metadata narrows scope; expensive | 1, 3 |
+   | `get_variable_defs` | bound variables/tokens (colors, text, spacing) — **the source for step 2 mapping**, not eyeballed hex | 1, 2 |
+   | `get_screenshot` | rendered image of a node — the target for the step 5 visual match | 5 |
+   | `download_assets` | export vectors as SVG / raster as PNG — icons and images | 1, 4 |
+   | `get_code_connect_map` | Figma node → existing code component mapping, if the team maintains Code Connect | 3 |
+
+   If the Figma tools are absent, stop and tell the user to connect the Figma MCP. Do not fall back to asking for pasted screenshots — that's a different workflow.
 
 2. **The current project is a Vue 3 + Tailwind codebase.** Look for `tailwind.config.js`, `tailwind.config.ts`, or tailwind imports in CSS. If the project isn't Vue + Tailwind, ask the user to confirm before proceeding — the skill's output assumptions won't hold.
 
-## The 4-step workflow
+3. **Playwright MCP is available (required for Step 5 only).** Check for a Playwright browser tool in the tool list. Steps 1–4 proceed without it; the visual match loop cannot. If it's absent when Step 5 begins, tell the user to install it (add `@playwright/mcp` to the MCP config and restart) — do not fall back to asking the user to paste screenshots.
 
-Run all four steps in order. **Pause for explicit user approval between step 3 (outline) and step 4 (build)** — structure mistakes are the most expensive to fix after code is written.
+## The 5-step workflow
+
+Run all five steps in order. **Pause for explicit user approval between step 3 (outline) and step 4 (build)** — structure mistakes are the most expensive to fix after code is written.
 
 ### Step 1: Inspect
 
 Pull the selected Figma frame via the MCP and produce a structured report. Do not write code in this step.
 
-The report has five sections:
+**Call order (cheap → expensive):**
+1. `get_metadata` on the selection → node tree and IDs. Build the hierarchy (section 1) from this without paying for full context.
+2. **List every top-level frame** metadata returns. Figma files usually ship more than one — mobile + desktop, or multiple states. Report them and ask: *"Which frame(s) / breakpoints are in scope?"* Do not assume a single frame. The chosen frame widths become the step-5 match targets.
+3. `get_design_context` on the in-scope node(s) → layout, spacing, fills, sizing (sections 2, 5, 6).
+4. `get_variable_defs` on the in-scope node(s) → bound variables. This resolves colors and text styles (sections 3, 4) to real token names and **feeds step 2 directly** — never read hex off the render.
+
+The report has seven sections:
 
 1. **Component hierarchy** — indented tree of every node with its type (`Frame`, `Component`, `Instance`, `Text`, `Vector`, etc.) and parent-child relationship. Mark Figma `Component` and `Instance` nodes distinctly — these usually map to separate Vue SFCs.
 
@@ -41,11 +60,17 @@ The report has five sections:
 
 5. **Spacing values** — distinct padding and gap values across the frame. Flag any that aren't multiples of 4 (these usually indicate pixel-pushing rather than token use).
 
+6. **Layout sizing** — for each frame and key node: the width/height sizing mode (`fill` / `hug` / `fixed`), any fixed dimensions where set, and whether the root is **full-bleed or a fixed-width/centered container**. This is the data that gets guessed most — column widths, grid track sizes, and container max-width. Capture the real numbers from Figma here so nobody invents them at build time. Never derive a width by eyeballing a screenshot.
+
+7. **Assets to export** — every `Vector`, image fill, and icon node. Icons and raster images cannot be rebuilt from tokens; they must be exported. List each with its node ID and target format (`SVG` for vectors/icons, `PNG` for raster). These get pulled via `download_assets` in step 4 — capture their IDs now so nothing gets hand-waved into a `<!-- TODO icon -->` at build time.
+
 See `references/inspection-template.md` for the exact output format.
 
 If more than 30% of colors or text styles are unbound, pause and tell the user: "This Figma file has substantial unbound values. The output will propose many new tokens. Do you want to proceed, or have the designer bind variables first?"
 
 ### Step 2: Map to Tailwind tokens
+
+**Start from `get_variable_defs`, not the render.** The step-1 variable dump is the left column of the mapping — every bound Figma variable is a value to match to a Tailwind token. Only values with no Figma variable get read from raw node data.
 
 Discover the Tailwind config at runtime. Search in this order:
 
@@ -65,6 +90,8 @@ Source categories:
 
 **Hard rule: never output arbitrary value classes (`bg-[#hex]`, `p-[17px]`, `text-[15px]`, etc.).** If a value doesn't have a token, propose one. Arbitrary values are how design systems rot — once they're in the codebase, they spread.
 
+For any raw hex that needs a token proposal, use the **`tailwind-color-token` skill** — it converts a hex to a named token consistent with the existing scale. Don't re-derive color naming by hand.
+
 See `references/token-mapping.md` for the decision table and examples.
 
 ### Step 3: Outline (STOP for user approval)
@@ -78,8 +105,9 @@ Before writing any code, produce a structural outline:
   - Slots (if any)
   - Top-level template structure (just the element tree, no classes yet)
   - Dependencies on other new components
-- **Existing components to reuse** — scan the project for components that already cover parts of the design. Don't rebuild a Button if `components/ui/Button.vue` already exists. List matches.
-- **Open questions** — anything ambiguous from the Figma: interaction states (hover/active/disabled) that weren't shown, loading/empty states, responsive behavior, keyboard behavior.
+- **Existing components to reuse** — first call `get_code_connect_map` on the in-scope nodes: where the team maintains Code Connect, it maps Figma components straight to the code component that implements them — deterministic, no grep-and-hope. For nodes it doesn't cover, scan the project by name/shape. Don't rebuild a Button if `components/ui/Button.vue` already exists. List matches with their source (Code Connect vs manual scan).
+- **Component variants** — for any Figma `Component` that belongs to a component **set** (has variants), pull the variant definitions via `get_design_context` on the set. Hover / disabled / active / size variants are *in the file* — enumerate them as real prop values; don't dump them into open questions as if unknown.
+- **Open questions** — only genuinely absent info: states not drawn anywhere in Figma, loading/empty states, keyboard behavior, responsive rules between the frames captured in step 1.
 
 **STOP HERE.** Output the outline and say: "Review the outline above. Reply with approval or changes before I generate code." Do not proceed to step 4 without an explicit "yes", "approved", "go", "build it", or equivalent. Ambiguous responses like "looks good but..." mean keep iterating on the outline.
 
@@ -113,21 +141,50 @@ After loading, generate the Vue SFCs following the conventions from that file pl
 - Figma padding → `p-N` or `px-N py-N` or `pt-N pr-N pb-N pl-N` based on whether values are symmetric
 - Figma alignment → `justify-*` (primary axis) + `items-*` (counter axis)
 
+**Assets:** export the step-1 asset inventory via `download_assets` (SVG for icons/vectors, PNG for raster) into the project's assets dir, and reference the real files. Never leave an icon as a placeholder comment or approximate it with an emoji/box.
+
 **After writing each file:**
 1. Run the project's linter (`npm run lint`, `pnpm lint`, or whatever the package.json defines)
 2. Run a typecheck if TS (`vue-tsc --noEmit` or `npm run typecheck`)
 3. If either fails, fix before moving to the next file
 4. Report the final diff and any proposed `tailwind.config.js` additions separately — the user applies config changes themselves
 
-### Verify
+### Step 5: Visual match loop
 
-After all files are written, verify against Figma:
+Only after the build step is complete and the files pass lint/typecheck.
 
-- For each generated component, re-query the Figma MCP for the source frame
-- Compare: structure, spacing, colors, typography
-- Produce a diff report: what matches, what differs, and why
+**Requires the Playwright MCP** (see Prerequisites) and a **running dev server**. Ask the user once for the base dev URL and the route for each built view — e.g. `http://localhost:5173/checkout`. Do not infer routes from the router config.
 
-Do not silently fix discrepancies. Report them and let the user decide whether the code or the design is wrong.
+> **The rule: no screen may be marked `✓ matched` without a written itemized diff table whose HIGH/MEDIUM rows are all resolved.** A visual glance, structural presence (correct component, correct column names), or "looks right" is explicitly not sufficient. The table is the gate.
+
+Run this loop **per page**:
+
+1. **Target** — Figma `get_screenshot` of the source node. This is the design you're matching against.
+2. **Actual — match the container, not just the frame width.** Via Playwright: navigate to the page's URL, set the viewport width to the Figma frame's width (apply the device-scale/retina factor so the capture resolution matches the design), and screenshot the view. Also replicate the frame's **layout box**: if the Figma frame sits at `x=0` full-bleed, the render must be full-bleed too — do not wrap it in a centered `max-w-* mx-auto`. Reproduce the actual left/right insets from Figma, never an invented container width.
+3. **Compare — mandatory itemized diff table, never eyeballed.** Before any verdict, output a table, one row per difference:
+
+   | # | Aspect | Figma | Render | Impact (H/M/L) |
+   |---|--------|-------|--------|----------------|
+
+   Walk *every* aspect below explicitly — an aspect you don't write a row for is one you didn't check, not one that passed. At minimum: **overall width (full-bleed vs centered)**, container max-width, **column count + each column width**, header text alignment, header fill color, **row count**, row/cell height, footers/toolbars, toggles/segmented controls, heading/subheading, page background, any missing or extra element — plus the usual spacing, typography, border radius, shadow.
+
+   **Impact:** `H` = wrong layout / size / structure / color a user would see; `M` = off-by-a-token spacing, size, or weight; `L` = sub-pixel / antialias cosmetic. Pull every Figma number from `get_design_context` / `get_variable_defs` / `get_metadata` / the step-1 sizing report — never off the screenshot, never invented (`width: 200` pulled from thin air is banned).
+
+   *Optional (L-rows only):* an automated pixel diff (`pixelmatch`, `odiff`) between the two screenshots catches sub-pixel cosmetic drift faster than eyeballing. It does **not** replace the table — H/M rows are judged by measured Figma values, not pixel deltas.
+4. **Verdict — gated on the table.** `✓ matched` is allowed ONLY when the table has **zero HIGH and zero MEDIUM rows**. Any H or M row ⇒ verdict is `⚠ not matched`; fix and re-screenshot. A page with no written table cannot be marked matched at all. Reusing the correct component is **not** a match — "right mechanism" ≠ "matches the design".
+5. **Otherwise (any H/M row)** → fix the `.vue`/Tailwind to close it, using values from Figma or the step-2 mapping only (never invented to "look about right"). If the page reuses a component, diff that component's *built-in* styling (header fill, alignment, footers, default column widths) against Figma too — differences are H/M rows, not "close enough". Re-run lint + typecheck, then re-screenshot and re-compare.
+6. **Cap at 10 iterations per page.** If the page still doesn't match after 10 rounds, stop and report the remaining diffs with their probable cause — do not keep looping.
+
+**Guard rails — these keep the loop from rotting the codebase:**
+
+- **Never emit an arbitrary Tailwind value to force a pixel match.** `p-[17px]`, `bg-[#hex]`, `text-[15px]` are forbidden mid-loop exactly as they are in the build step. If closing a diff requires a value with no token, flag it as a blocker and stop chasing that diff — do not hack in the arbitrary class.
+- **No-progress detection.** If an iteration's diff list is the same as the previous iteration's, stop early — do not spend the remaining rounds spinning on a diff you can't close.
+- **Named false-diff sources — report, never loop on them:** a font not loaded in the local dev environment, real/live data vs Figma placeholder text, or a mid-animation frame. These are environment mismatches, not code bugs. **Layout, size, and color diffs are never "noise"** — do not wave them away as environment; they are always real H/M rows.
+- **Fresh eyes beat optimism bias — the builder's own "matched" doesn't count.** The agent that wrote the code is biased toward declaring it done, especially under pressure to show progress. Run the step-3 compare as an **independent** pass — a separate subagent with no stake in success, or a fresh pass explicitly told to assume the render is wrong until the table proves otherwise — and treat every diff it returns as real until a measurement closes it. "Looks matched to me" is exactly the failure this loop exists to catch.
+
+**Regression case this gate exists to prevent:** a full-bleed Figma table (frame at `x=0`) rendered as a centered `max-w-[1400px] mx-auto`, with guessed narrow column widths and 1 seeded row instead of 6 — all declared `✓ matched` with no diff table written. That verdict is now impossible: the missing table blocks the verdict outright, and full-bleed→centered, wrong column widths, and 6→1 row count are each HIGH rows that force `⚠ not matched`.
+
+**Output** — per page: `✓ matched (N iterations)` or `⚠ remaining diffs after 10` followed by the diff list and any token/font blockers. As everywhere else in this skill: do not silently "fix" a discrepancy that stems from the design being wrong — report it and let the user decide whether the code or the design is off.
 
 ## When the user wants to skip steps
 
@@ -152,7 +209,7 @@ Each step produces a clearly-labeled section in the response:
 **STOP — approve before I build.**
 ```
 
-Step 4 outputs the code files directly via the file-writing tools, with a summary of what was created.
+Step 4 outputs the code files directly via the file-writing tools, with a summary of what was created. Step 5 outputs a per-page match report (`✓ matched (N iterations)` or `⚠ remaining diffs after 10` + blockers).
 
 ## Reference files
 

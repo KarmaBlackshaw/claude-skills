@@ -2,6 +2,12 @@
 
 Rules and examples for step 2 — mapping Figma values to Tailwind classes.
 
+## Where the values come from
+
+The left column of every mapping table is the **`get_variable_defs` output from step 1** — the variables actually bound in the Figma file — plus any unbound raw values the node data exposed. Do not read colors or sizes off the rendered screenshot; bound variables are authoritative.
+
+To name a proposed token from a raw hex, use the **`tailwind-color-token` skill** rather than inventing names ad hoc.
+
 ## The hard rule
 
 **Never emit arbitrary value classes.** These are forbidden in output:
