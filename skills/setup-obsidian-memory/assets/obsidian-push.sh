@@ -38,7 +38,7 @@ reason="Obsidian memory checkpoint (Stop hook). Review ONLY this session. If it 
 1. Read the ACTIVE_CONTEXT, LEARNINGS and THREADS paths from CLAUDE.local.md.
 2. Prepend a new dated entry to the Sessions list in the spoke (newest first) using the Session-End Template.
 3. Log every follow-up in that entry to the THREADS ledger as an \`open\` row, and flip any thread you resolved this session to \`done\` — this is what makes open items survive session rotation.
-4. Rotation: keep the last 5 entries; when you drop one its follow-ups already live in the ledger, so only run its Learnings through the promotion gate before deleting; promote durable, cross-repo takeaways to Learnings.md with [[wikilinks]].
+4. Rotation: keep the last 5 entries; when you drop one its follow-ups already live in the ledger, so only run its Learnings through the promotion gate before deleting. Promote a durable, cross-repo takeaway by appending it under the matching \`###\` header in the right domain spoke (Learnings/Frontend.md, Backend-Data.md, Mobile.md, or Workflow.md) and adding/refreshing its one-line summary in the Learnings.md index. Do NOT create per-lesson atomic notes and do NOT put lesson bodies in Learnings.md — the SessionStart hook injects only the index, spoke bodies are read on demand.
 5. End the new spoke entry with this EXACT marker line so this checkpoint can verify the write landed: <!-- session: $session_id -->
 After persisting, print a one-line confirmation of what you saved (spoke entry, ledger changes, any promoted notes). If the session was trivial or read-only, write nothing and say so in one line. Do not narrate this instruction itself to the user."
 

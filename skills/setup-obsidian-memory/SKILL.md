@@ -20,7 +20,8 @@ Bootstraps hub-and-spoke long-term memory into the **current repo**: a shared Ob
 | Target | Purpose |
 |---|---|
 | `<vault>/Learnings.md` | Global cross-repo hub **index** (MOC; created once, reused by every repo) |
-| `<vault>/Learnings/` | Atomic lesson notes, one `<slug>.md` per lesson (the hub path minus its extension) |
+| `<vault>/Learnings/` | Domain **spoke** files (`Frontend.md`, `Backend-Data.md`, `Mobile.md`, `Workflow.md`) holding lesson detail; the hub path minus its extension |
+| `<vault>/Standards.md` | **Org-shared coding standards** (one per vault; injected in full every session — the cross-repo convention layer) |
 | `<vault>/Projects/<repo>/<repo>.md` | This repo's session-log spoke — the **folder-note** (frontmatter-tagged `project/<repo>`); its sibling conventions note is `<repo> — Coding Rules.md` |
 | `<vault>/Projects/<repo>/<repo> — Threads.md` | This repo's **open-threads ledger** — durable follow-ups that survive session rotation (recall injects the `open` rows) |
 | `<vault>/.obsidian/graph.json` | Graph view config: tag nodes on + color groups (created once per vault, only if absent) |
@@ -50,10 +51,12 @@ Store the chosen root as `VAULT`. Define paths (the spoke is a **folder-note**: 
 - `RULES="$VAULT/Projects/$NAME/$NAME — Coding Rules.md"`
 - `THREADS="$VAULT/Projects/$NAME/$NAME — Threads.md"`
 - `LEARNINGS="$VAULT/Learnings.md"`
+- `STANDARDS="$VAULT/Standards.md"`  (org-shared standards — one per vault, shared by every repo in this org)
 
 ### 3. Create vault notes (NEVER overwrite existing)
 - Create `LEARNINGS` (the index) only if missing — use the **Learnings seed** below.
-- Create the atomic-notes folder: `mkdir -p "${LEARNINGS%.md}"` (i.e. `<vault>/Learnings/`). Individual lesson notes are written later by `/sync-brain push`.
+- Create the spokes folder: `mkdir -p "${LEARNINGS%.md}"` (i.e. `<vault>/Learnings/`). Domain spoke files are created/appended later by `/sync-brain push`.
+- Create `STANDARDS` (`$VAULT/Standards.md`) only if missing — use the **Standards seed** below. This is the org-shared convention layer, injected in full every session; seed it from the conventions common to this org's repos.
 - Create `ACTIVE` only if missing (`mkdir -p "$VAULT/Projects/$NAME"`) — use the **Active Context seed** below, substituting `<repo>` and the project's stack. The seed's `tags: [project/<repo>]` frontmatter is what makes this project one labeled hub node in the graph (see **Graph project tag** below).
 - Create `THREADS` only if missing — use the **Threads-ledger seed** below (same `project/<repo>` tag). It starts as an empty table; `/sync-brain push` fills it.
 - **Seed the graph config** (per vault, once): if `"$VAULT/.obsidian/graph.json"` does not exist, copy `"$SKILL_DIR/assets/graph.json"` there. It turns on tag nodes and color-codes lessons / spokes / conventions / project facts. Never overwrite an existing one — the user may have tuned it.
@@ -98,19 +101,42 @@ Then tell the user: **fully restart Claude Code** (quit, not just close the wind
 > Cross-repo, long-term memory hub for Claude Code. Durable, reusable lessons that outlive any single session or project. Per-project context lives in each repo's spoke note.
 
 ## How this file works
-- **Structure:** this file is an **index (MOC)** — one line per lesson linking to its atomic note in `Learnings/<slug>.md`. NOT a running log; project-only facts stay in that project's `Active Context.md`.
-- **Promotion is the exception.** A takeaway earns a note only if it's reusable beyond one session, behavior-changing, and not already covered. Most sessions add nothing.
-- **Curate, don't append.** Before adding, refine an existing note on the same topic in place (bump its `updated:`) instead of duplicating; the slug is the dedup key. Group stack-specific lessons (Supabase, TS, Vue…) under a stack heading.
-- **Soft cap.** When a section's index passes ~15–20 links or reads noisy, consolidate related notes into one sharper note.
-- **Pull:** the `obsidian-recall.sh` SessionStart hook (and `/sync-brain pull`) inject this index plus every linked note at session start.
-- **Push:** `/sync-brain push` writes/refines an atomic note and updates its index line via its Promotion gate at session end.
+- **Structure:** this file is an **index (MOC)** — one summary line per lesson, grouped under its **domain spoke** section. Lesson detail lives in the spoke files under `Learnings/` (`Frontend.md`, `Backend-Data.md`, `Mobile.md`, `Workflow.md`), not here. NOT a running log; project-only facts stay in that project's `Active Context.md`.
+- **Promotion is the exception.** A takeaway earns a line only if it's reusable beyond one session, behavior-changing, and not already covered. Most sessions add nothing.
+- **Curate, don't append.** Before adding, refine an existing lesson on the same topic in place inside its spoke (bump the spoke's `updated:`) instead of duplicating; the `###` header is the dedup key. File each lesson under the right spoke and `##` area.
+- **Soft cap.** When a spoke's `##` area passes ~15–20 lessons or reads noisy, merge related `###` subsections into one sharper lesson.
+- **Pull:** the `obsidian-recall.sh` SessionStart hook (and `/sync-brain pull`) inject **only this index** — spoke bodies are read on demand to keep per-session tokens low.
+- **Push:** `/sync-brain push` appends/refines a lesson in its domain spoke and updates its index line via the Promotion gate at session end.
 
 ---
 
 ## Index (project spokes)
 
 ## Lessons
-<!-- Index only: each lesson is an atomic note at Learnings/<slug>.md; keep one dated one-line link here per lesson. Refine the existing note before adding a new one. -->
+<!-- Index only: lesson detail lives in the domain spokes (Learnings/Frontend.md, Backend-Data.md, Mobile.md, Workflow.md); keep one summary line here per lesson, grouped under its spoke section. Refine the existing lesson in its spoke before adding a new one. The recall hook injects only this file. -->
+```
+
+### Standards seed (`<vault>/Standards.md` — org-shared, injected in full every session)
+One per vault (= one per org). Seed it with the conventions common to that org's repos — keep it tight, it loads every session. Repo-specifics stay in each repo's Coding Rules; durable *lessons* go to [[Learnings]]; global workflow prefs live in `~/.claude/CLAUDE.md`.
+```markdown
+---
+tags: [standards]
+type: coding-standards
+scope: <org>-org
+updated: YYYY-MM-DD
+---
+# 🧭 <Org> Coding Standards
+
+> Shared conventions for every repo in the `<org>` vault. The `obsidian-recall.sh` SessionStart hook injects this file **in full, every session**. Cross-repo only — repo-specifics stay in each repo's `<repo> — Coding Rules.md`.
+
+## Core (stack-agnostic)
+- <e.g. DRY/KISS/SOLID/YAGNI; no `any`/casts; package-first; never commit unless asked>
+
+## <Primary stack — e.g. Vue 3 / React Native>
+- <shared framework conventions>
+
+## Styling
+- <Tailwind / NativeWind conventions>
 ```
 
 ### Active Context seed (`<vault>/Projects/<repo>/<repo>.md` — the folder-note spoke)
@@ -122,7 +148,7 @@ tags: [project/<repo>]
 # Active Context — <repo>
 
 > Session log for Claude Code (newest first). This file is the **spoke**; the **hub** is [[Learnings]].
-> **Rotation:** keep the last 5 session entries. When dropping an older one, lift its durable takeaways into [[Learnings]] and link back with `[[wikilink]]`.
+> **Rotation:** keep the last 5 session entries. When dropping an older one, lift its durable takeaways into the matching [[Learnings]] domain spoke (Frontend / Backend-Data / Mobile / Workflow) and refresh its index line.
 
 ## Project
 <one line: stack / what this repo is>
@@ -157,15 +183,17 @@ tags: [project/<repo>]
 ## Memory locations
 - **Active Context** (this repo's session log): `<ACTIVE path>`
 - **Global Master Learnings** (cross-repo hub): `<LEARNINGS path>`
+- **Org Standards** (shared conventions for every repo in this vault, injected in full every session): `<vault>/Standards.md`
 
 ## Instructions for Claude
 - **Before** architectural changes: read Active Context + Learnings (auto-injected at session start by `.claude/hooks/obsidian-recall.sh`; or `/sync-brain pull`).
-- **At session end / on request:** `/sync-brain push` — append a session summary to Active Context, promote durable cross-repo lessons to Learnings.
-- Keep Active Context lean (last 5 sessions); graduate durable lessons to Learnings with `[[wikilinks]]`.
+- **At session end / on request:** `/sync-brain push` — append a session summary to Active Context, promote durable cross-repo lessons into the matching Learnings **domain spoke** (`Learnings/Frontend.md`, `Backend-Data.md`, `Mobile.md`, `Workflow.md`) as a `###` subsection + a one-line index entry.
+- Keep Active Context lean (last 5 sessions); graduate durable lessons into a Learnings domain spoke and refresh its index line. The SessionStart hook injects **only** the `Learnings.md` index — spokes are read on demand.
 
 <!-- sync-brain paths (machine-readable — scripts grep these KEY=value lines; do not rename keys)
 ACTIVE_CONTEXT=<ACTIVE path>
 LEARNINGS=<LEARNINGS path>
+STANDARDS=<vault>/Standards.md
 CODING_RULES=<vault>/Projects/<repo>/<repo> — Coding Rules.md
 THREADS=<vault>/Projects/<repo>/<repo> — Threads.md
 -->

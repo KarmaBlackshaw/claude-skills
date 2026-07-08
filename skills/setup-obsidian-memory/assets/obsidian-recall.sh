@@ -15,23 +15,24 @@ PTR="$ROOT/CLAUDE.local.md"
 getpath() { grep -m1 "^$1=" "$PTR" 2>/dev/null | cut -d= -f2- || true; }
 
 LEARNINGS="$(getpath LEARNINGS)"
+STANDARDS="$(getpath STANDARDS)"
 RULES="$(getpath CODING_RULES)"
 ACTIVE="$(getpath ACTIVE_CONTEXT)"
 THREADS="$(getpath THREADS)"
 
 out=""
 if [ -n "$LEARNINGS" ] && [ -f "$LEARNINGS" ]; then
+  # Inject the index (MOC) ONLY — one summary line per lesson, grouped by domain
+  # spoke. Full detail lives in Learnings/<Spoke>.md (Frontend, Backend-Data,
+  # Mobile, Workflow) and is read on demand, NOT injected, to keep per-session
+  # tokens low (~2K vs the old ~11K that expanded every atomic note body).
   out+="# Global Master Learnings (Obsidian hub — index)"$'\n\n'"$(cat "$LEARNINGS")"$'\n\n'
-  # Expand every atomic lesson note. The notes folder is the hub file without its
-  # extension: <vault>/Learnings.md -> <vault>/Learnings/. Index + full detail.
-  NOTES_DIR="${LEARNINGS%.md}"
-  if [ -d "$NOTES_DIR" ]; then
-    shopt -s nullglob
-    for note in "$NOTES_DIR"/*.md; do
-      out+="## Lesson: $(basename "${note%.md}")"$'\n\n'"$(cat "$note")"$'\n\n'
-    done
-    shopt -u nullglob
-  fi
+fi
+# Org standards: shared conventions for every repo in this org's vault. Injected
+# in FULL every session (unlike Learnings) — they apply to all work, not just
+# situationally. General (org) before specific (repo). Keep the file tight.
+if [ -n "$STANDARDS" ] && [ -f "$STANDARDS" ]; then
+  out+="# Org Coding Standards (Obsidian — shared across this org's repos)"$'\n\n'"$(cat "$STANDARDS")"$'\n\n'
 fi
 if [ -n "$RULES" ] && [ -f "$RULES" ]; then
   out+="# Coding Rules — this repo (Obsidian spoke)"$'\n\n'"$(cat "$RULES")"$'\n\n'

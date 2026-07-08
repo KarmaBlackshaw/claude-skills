@@ -78,6 +78,35 @@ Use this exact structure for the step 1 output. Keep it scannable — the user w
 
 **Assets: 2** — exported via `download_assets` in step 4, not rebuilt or placeholdered.
 
+### 8. Match-spec (machine-readable)
+
+The step-5 verifier asserts rendered computed styles against this, field by field. One object per key node; include only fields Figma specifies. Numbers come from `get_design_context` / `get_variable_defs`, never the screenshot.
+
+```json
+[
+  {
+    "node": "RootContainer",
+    "nodeId": "12:2",
+    "expected": {
+      "layout": "full-bleed",
+      "maxWidthPx": null,
+      "paddingPx": [32, 32, 32, 32],
+      "gapPx": 24,
+      "color": "surface/default"
+    }
+  },
+  { "node": "Table col: Name",   "nodeId": "12:8", "expected": { "widthPx": 240 } },
+  { "node": "Table col: Status", "nodeId": "12:9", "expected": { "widthPx": 120 } },
+  {
+    "node": "Header text \"Dashboard\"",
+    "nodeId": "12:5",
+    "expected": { "fontSizePx": 24, "lineHeightPx": 32, "fontWeight": 700, "color": "heading/lg" }
+  }
+]
+```
+
+**Tolerances the verifier applies:** spacing exact, sizing ±1px, color exact (both sides normalized to `rgb()`). Any field outside tolerance is an automatic HIGH/MEDIUM diff row — see step 5.
+
 ### Summary
 
 - Nodes: 6 (1 Component, 1 Instance, 3 Frames, 2 Text, 1 Vector)
@@ -85,6 +114,7 @@ Use this exact structure for the step 1 output. Keep it scannable — the user w
 - Unbound text styles: 1
 - Off-grid spacing: 1
 - Assets to export: 2
+- Match-spec: 4 nodes captured (step-5 assertion source)
 - Mapping recommendation: [clean / needs-tokens / needs-designer-fix]
 ```
 
@@ -96,7 +126,7 @@ Use this exact structure for the step 1 output. Keep it scannable — the user w
 
 ## What to do with Figma MCP responses
 
-Sources per section: `get_metadata` → section 1 (tree). `get_design_context` → sections 2, 5, 6 (`fills`, `strokes`, `layoutMode`, `itemSpacing`, `paddingTop/Right/Bottom/Left`, `styles`, `layoutSizingHorizontal` / `layoutSizingVertical` = `FILL` / `HUG` / `FIXED`, `width` / `height`, `absoluteBoundingBox`). `get_variable_defs` → sections 3, 4 (the authoritative bound-variable list). `download_assets` → section 7 exports.
+Sources per section: `get_metadata` → section 1 (tree). `get_design_context` → sections 2, 5, 6 (`fills`, `strokes`, `layoutMode`, `itemSpacing`, `paddingTop/Right/Bottom/Left`, `styles`, `layoutSizingHorizontal` / `layoutSizingVertical` = `FILL` / `HUG` / `FIXED`, `width` / `height`, `absoluteBoundingBox`). `get_variable_defs` → sections 3, 4 (the authoritative bound-variable list). `download_assets` → section 7 exports. Section 8 (match-spec) reprojects the same measured numbers (sections 2/5/6) and colors/text (sections 3/4) into per-node JSON — no new Figma calls, just restructured for machine assertion.
 
 - Prefer `get_variable_defs` to decide bound vs unbound: a color/text style is **bound** when it appears there as a named variable.
 - Fallback from node data: a color is bound when `boundVariables.fills[0]` resolves to a variable name; a text style is bound when `styles.text` is set — resolve it to the style name.

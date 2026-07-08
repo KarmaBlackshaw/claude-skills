@@ -48,7 +48,7 @@ Pull the selected Figma frame via the MCP and produce a structured report. Do no
 3. `get_design_context` on the in-scope node(s) → layout, spacing, fills, sizing (sections 2, 5, 6).
 4. `get_variable_defs` on the in-scope node(s) → bound variables. This resolves colors and text styles (sections 3, 4) to real token names and **feeds step 2 directly** — never read hex off the render.
 
-The report has seven sections:
+The report has eight sections (7 human-readable + 1 machine-readable):
 
 1. **Component hierarchy** — indented tree of every node with its type (`Frame`, `Component`, `Instance`, `Text`, `Vector`, etc.) and parent-child relationship. Mark Figma `Component` and `Instance` nodes distinctly — these usually map to separate Vue SFCs.
 
@@ -63,6 +63,8 @@ The report has seven sections:
 6. **Layout sizing** — for each frame and key node: the width/height sizing mode (`fill` / `hug` / `fixed`), any fixed dimensions where set, and whether the root is **full-bleed or a fixed-width/centered container**. This is the data that gets guessed most — column widths, grid track sizes, and container max-width. Capture the real numbers from Figma here so nobody invents them at build time. Never derive a width by eyeballing a screenshot.
 
 7. **Assets to export** — every `Vector`, image fill, and icon node. Icons and raster images cannot be rebuilt from tokens; they must be exported. List each with its node ID and target format (`SVG` for vectors/icons, `PNG` for raster). These get pulled via `download_assets` in step 4 — capture their IDs now so nothing gets hand-waved into a `<!-- TODO icon -->` at build time.
+
+8. **Match-spec (machine-readable)** — a JSON array, one object per key node (root, each column, header, each distinct component), capturing the measured numbers step 5 asserts against: `{ node, nodeId, expected: { widthPx, paddingPx, gapPx, fontSizePx, lineHeightPx, fontWeight, color, borderRadiusPx, layout, ... } }`. Include only fields Figma actually specifies; pull every number from `get_design_context` / `get_variable_defs`, never the screenshot. Step 5 resolves each entry to a rendered selector and asserts against it — **without this JSON, step 5 falls back to eyeballing, which is the exact failure this skill exists to prevent.** See the match-spec block in `references/inspection-template.md`.
 
 See `references/inspection-template.md` for the exact output format.
 
@@ -161,7 +163,7 @@ Run this loop **per page**:
 
 1. **Target** — Figma `get_screenshot` of the source node. This is the design you're matching against.
 2. **Actual — match the container, not just the frame width.** Via Playwright: navigate to the page's URL, set the viewport width to the Figma frame's width (apply the device-scale/retina factor so the capture resolution matches the design), and screenshot the view. Also replicate the frame's **layout box**: if the Figma frame sits at `x=0` full-bleed, the render must be full-bleed too — do not wrap it in a centered `max-w-* mx-auto`. Reproduce the actual left/right insets from Figma, never an invented container width.
-3. **Compare — mandatory itemized diff table, never eyeballed.** Before any verdict, output a table, one row per difference:
+3. **Measure, then compare — programmatic assertion first, table second.** Before eyeballing anything, pull the rendered node's computed styles via Playwright (`getComputedStyle` on the matched selector: padding, gap, `font-size`, `line-height`, `font-weight`, `color`, `width`, `border-radius`) and assert each numerically against the step-1 **match-spec** JSON. Tolerances: spacing exact, sizing ±1px, color exact (convert both sides to `rgb()` and compare). Every field outside tolerance is an **automatic diff row — the eye gets no vote on numbers.** Then output the itemized table, one row per difference, seeded with every failed assertion plus the visual-only aspects a computed style can't catch (missing/extra element, wrong image, wrong icon):
 
    | # | Aspect | Figma | Render | Impact (H/M/L) |
    |---|--------|-------|--------|----------------|
@@ -173,14 +175,15 @@ Run this loop **per page**:
    *Optional (L-rows only):* an automated pixel diff (`pixelmatch`, `odiff`) between the two screenshots catches sub-pixel cosmetic drift faster than eyeballing. It does **not** replace the table — H/M rows are judged by measured Figma values, not pixel deltas.
 4. **Verdict — gated on the table.** `✓ matched` is allowed ONLY when the table has **zero HIGH and zero MEDIUM rows**. Any H or M row ⇒ verdict is `⚠ not matched`; fix and re-screenshot. A page with no written table cannot be marked matched at all. Reusing the correct component is **not** a match — "right mechanism" ≠ "matches the design".
 5. **Otherwise (any H/M row)** → fix the `.vue`/Tailwind to close it, using values from Figma or the step-2 mapping only (never invented to "look about right"). If the page reuses a component, diff that component's *built-in* styling (header fill, alignment, footers, default column widths) against Figma too — differences are H/M rows, not "close enough". Re-run lint + typecheck, then re-screenshot and re-compare.
-6. **Cap at 10 iterations per page.** If the page still doesn't match after 10 rounds, stop and report the remaining diffs with their probable cause — do not keep looping.
+6. **Interactive states — verify every drawn variant, not just the resting state.** For each state the component set defines in Figma (hover, focus, active, disabled, selected — enumerated in the step-3 outline), drive it in Playwright (`page.hover`, force `:focus`, set the `disabled` prop / `aria-disabled`, etc.), `get_screenshot` the matching Figma variant node, and run the same measure-then-table compare (step 3) for that state. A resting-state match with a broken hover/disabled state is `⚠ not matched`. Skip only states Figma never drew.
+7. **Cap at 10 iterations per page.** If the page still doesn't match after 10 rounds, stop and report the remaining diffs with their probable cause — do not keep looping.
 
 **Guard rails — these keep the loop from rotting the codebase:**
 
 - **Never emit an arbitrary Tailwind value to force a pixel match.** `p-[17px]`, `bg-[#hex]`, `text-[15px]` are forbidden mid-loop exactly as they are in the build step. If closing a diff requires a value with no token, flag it as a blocker and stop chasing that diff — do not hack in the arbitrary class.
 - **No-progress detection.** If an iteration's diff list is the same as the previous iteration's, stop early — do not spend the remaining rounds spinning on a diff you can't close.
 - **Named false-diff sources — report, never loop on them:** a font not loaded in the local dev environment, real/live data vs Figma placeholder text, or a mid-animation frame. These are environment mismatches, not code bugs. **Layout, size, and color diffs are never "noise"** — do not wave them away as environment; they are always real H/M rows.
-- **Fresh eyes beat optimism bias — the builder's own "matched" doesn't count.** The agent that wrote the code is biased toward declaring it done, especially under pressure to show progress. Run the step-3 compare as an **independent** pass — a separate subagent with no stake in success, or a fresh pass explicitly told to assume the render is wrong until the table proves otherwise — and treat every diff it returns as real until a measurement closes it. "Looks matched to me" is exactly the failure this loop exists to catch.
+- **Fresh eyes are mandatory — the builder's own "matched" doesn't count.** The agent that wrote the code is biased toward declaring it done, especially under pressure to show progress. The step-3 compare MUST run as a **separate subagent that never saw the build** — hand it only the Figma match-spec (step 1), the target `get_screenshot`, and the page URL, and tell it to assume the render is wrong until the numbers prove otherwise. The builder does not mark its own work matched. Treat every diff the verifier returns as real until a measurement closes it. "Looks matched to me" is exactly the failure this loop exists to catch.
 
 **Regression case this gate exists to prevent:** a full-bleed Figma table (frame at `x=0`) rendered as a centered `max-w-[1400px] mx-auto`, with guessed narrow column widths and 1 seeded row instead of 6 — all declared `✓ matched` with no diff table written. That verdict is now impossible: the missing table blocks the verdict outright, and full-bleed→centered, wrong column widths, and 6→1 row count are each HIGH rows that force `⚠ not matched`.
 

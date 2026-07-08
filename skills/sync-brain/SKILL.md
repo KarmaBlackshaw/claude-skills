@@ -13,7 +13,8 @@ Hub-and-spoke long-term memory. The **hub** is a global `Learnings.md` in an Obs
 
 - `ACTIVE_CONTEXT=` → this repo's session log
 - `LEARNINGS=` → global cross-repo learnings
-- `CODING_RULES=` → conventions synced from `CLAUDE.md`
+- `CODING_RULES=` → this repo's conventions synced from `CLAUDE.md`
+- `STANDARDS=` → org-shared coding standards (one per vault; injected in full every session)
 - `THREADS=` → this repo's open-threads ledger (durable follow-ups; survives session rotation)
 
 ```bash
@@ -21,7 +22,7 @@ grep -m1 '^ACTIVE_CONTEXT=' CLAUDE.local.md | cut -d= -f2-
 grep -m1 '^LEARNINGS=' CLAUDE.local.md | cut -d= -f2-
 ```
 
-The atomic **lesson notes** live in `<notes-dir>/`, which is the `LEARNINGS` path with its extension removed (`…/Learnings.md` → `…/Learnings/`). `LEARNINGS` itself is only the index.
+The lesson **detail** lives in four **domain spokes** under `<notes-dir>/` (the `LEARNINGS` path with its extension removed, `…/Learnings.md` → `…/Learnings/`): `Frontend.md` (Vue / TS / data-model & UI), `Backend-Data.md` (Supabase / PostgREST / API), `Mobile.md` (React Native / Expo), `Workflow.md` (memory / agents / build pipeline / shell). Each groups lessons under `##`/`###` headers. `LEARNINGS` itself is only the index — the SessionStart hook injects it alone; spokes are read on demand. (Legacy per-lesson atomic notes are archived under `<notes-dir>/_archive/`.)
 
 If `CLAUDE.local.md` is missing, tell the user this repo isn't wired to the vault yet and stop.
 
@@ -50,15 +51,17 @@ Persist this session's outcome. Default target is the **spoke** (`ACTIVE_CONTEXT
 
 A takeaway failing any gate stays in `ACTIVE_CONTEXT`. Stack-specific lessons (Supabase, TS, Vue…) MAY be promoted, but file them under a stack heading — never as loose top-level notes.
 
-**Curate as atomic notes.** The hub `LEARNINGS` is an **index** — one `[[wikilink]]` line per lesson. Each lesson's full detail lives in its own note at `<notes-dir>/<slug>.md` (see Path discovery). To promote a lesson that passed the gate:
-- **Slug** = kebab-case of the lesson title — it's the dedup key.
-- **Existing note on the topic?** Refine that note in place (tighten, add the nuance, bump `updated:`). Do NOT create a near-duplicate; leave its index line as-is.
-- **New note?** Create `<notes-dir>/<slug>.md` from the **Atomic-Note Template** below, then add ONE index line under the right section heading in `LEARNINGS`: `- **<one-line summary>** [[<slug>]]`.
-- Stack-specific lessons (Supabase, TS, Vue…) go under a stack section heading — never loose.
+**Convention vs lesson — route to the right home.** A durable *always-on rule* the whole org should follow (a coding convention, e.g. "no `any`", "NativeWind only") belongs in **`STANDARDS`**, not `LEARNINGS`: Standards are injected in full every session; Learnings are situational insights read on demand. Add a new shared convention as a tight bullet under the right `##` in `STANDARDS`. A repo-only rule stays in that repo's `CODING_RULES`. Only cross-repo *insight-shaped* takeaways go to the Learnings spokes.
 
-**Soft cap.** If a section's index passes ~15–20 links or reads noisy, consolidate related notes into one sharper note (merge the bodies, delete the merged files, collapse their index lines).
+**Curate in domain spokes.** The hub `LEARNINGS` is an **index** — one summary line per lesson, grouped under its domain-spoke section. Each lesson's full detail is a `###` subsection inside the matching spoke (`Frontend` / `Backend-Data` / `Mobile` / `Workflow`). To promote a lesson that passed the gate:
+- **Pick the spoke by domain**, and let the `###` header be the lesson's one-line claim (the dedup key — scan the spoke's existing headers first).
+- **Existing lesson on the topic?** Refine that `###` subsection in place (tighten, add the nuance, bump the spoke's `updated:`). Do NOT add a near-duplicate; leave its index line as-is.
+- **New lesson?** Append a `###` subsection under the right `##` area in the spoke (create the spoke file with `tags: [learning]` frontmatter if it doesn't exist yet; body = the mechanism + fix, keep a `Source:` line), then add ONE index line under that spoke's section in `LEARNINGS`: `- **<one-line summary>** — <terse how>`.
+- **Never** put a lesson body in `LEARNINGS`, and **never** create a new per-lesson file — the SessionStart hook injects only the index; bloating it or re-fragmenting into atomic notes defeats the token budget the spokes exist to protect.
 
-5. Write the spoke, the `THREADS` ledger, the atomic note(s), and the hub index. Confirm in one line exactly what you saved: the spoke entry, ledger rows opened/closed, and any notes created or refined.
+**Soft cap.** If a spoke's `##` area passes ~15–20 lessons or reads noisy, merge related `###` subsections into one sharper lesson (merge the bodies, collapse their index lines).
+
+5. Write the session **spoke** (`ACTIVE_CONTEXT`), the `THREADS` ledger, any promoted lesson(s) in their **domain spoke**, and the hub index. Confirm in one line exactly what you saved: the session entry, ledger rows opened/closed, and any lessons added or refined.
 
 ## Session-End Template
 
@@ -82,19 +85,16 @@ Durable open action items — the one place follow-ups outlive session rotation.
 | done | <resolved item> | YYYY-MM-DD | <session title> |
 ```
 
-## Atomic-Note Template (`<notes-dir>/<slug>.md`)
+## Domain-Spoke Lesson format (`<notes-dir>/{Frontend,Backend-Data,Mobile,Workflow}.md`)
+
+Each spoke carries `tags: [learning]` frontmatter and an `updated:` date. A lesson is a `###` subsection under a `##` area:
 
 ```markdown
----
-tags: [learning, <stack-or-workflow>]
-created: YYYY-MM-DD
-updated: YYYY-MM-DD
----
-# <Lesson title — the claim in one line>
+### <Lesson title — the claim in one line>
 
 <the mechanism: what happens, why, and the fix — a short paragraph, not a session log>
 
-Source: [[Active Context]] · <repo> · YYYY-MM-DD
+Source: <repo> · YYYY-MM-DD
 ```
 
 ## Rules
@@ -103,4 +103,4 @@ Source: [[Active Context]] · <repo> · YYYY-MM-DD
 - Promotion to the hub is the exception, not the default — most sessions add nothing to `Learnings.md`.
 - Keep the spoke (`<repo>.md`, resolved from `ACTIVE_CONTEXT`) lean; keep `Learnings.md` small and curated — refine existing entries over appending new ones.
 - Pass file content through unchanged except for the edits above — in particular, preserve the spoke's `tags: [project/<repo>]` frontmatter (it's the note's graph hub label; see setup-obsidian-memory → **Graph project tag**).
-- Global atomic lesson notes stay tagged `[learning, …]` only — never add a `project/<repo>` tag; they're cross-repo and hub to `[[Learnings]]`.
+- Domain spokes (`Learnings/{Frontend,Backend-Data,Mobile,Workflow}.md`) stay tagged `[learning]` only — never add a `project/<repo>` tag; they're cross-repo and hub to `[[Learnings]]`.
