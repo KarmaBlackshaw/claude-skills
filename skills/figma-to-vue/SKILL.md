@@ -1,6 +1,6 @@
 ---
 name: figma-to-vue
-description: Convert Figma designs into Vue (2 or 3) + Tailwind CSS components with structural accuracy and design system fidelity. Use this skill whenever the user pastes a Figma URL, mentions "figma", asks to "build from figma", "implement this design", "match this mockup", or references a Figma frame, component, or design file — even if they don't explicitly ask for the skill. Also use when the user asks to inspect, audit, or map a Figma file to their Vue codebase, or asks how to match a Figma design in code. The skill auto-detects the project's Vue version (2.x, 2.7, or 3.x) and adapts conventions accordingly. It enforces a 5-step workflow (inspect → map → outline → build → visual-match) that prevents the common failure modes of guessing hex codes, rounding spacing, and misreading component hierarchy. The final step drives a Playwright screenshot loop that compares each rendered page against the Figma image and iterates until they match.
+description: Convert Figma designs into Vue (2 or 3) + Tailwind CSS components with structural accuracy and design system fidelity. Use this skill whenever the user pastes a Figma URL, mentions "figma", asks to "build from figma", "implement this design", "match this mockup", or references a Figma frame, component, or design file — even if they don't explicitly ask for the skill. Also use when the user asks to inspect, audit, or map a Figma file to their Vue codebase, or asks how to match a Figma design in code. The skill auto-detects the project's Vue version (2.x, 2.7, or 3.x) and adapts conventions accordingly. It enforces a 5-step workflow (inspect → map → outline → build → visual-match) that prevents the common failure modes of guessing hex codes, rounding spacing, and misreading component hierarchy. The final step drives a Playwright screenshot loop that compares each built component and each rendered page against the Figma image and iterates until they match.
 ---
 
 # Figma to Vue
@@ -32,7 +32,7 @@ Before starting, verify:
 
 2. **The current project is a Vue 3 + Tailwind codebase.** Look for `tailwind.config.js`, `tailwind.config.ts`, or tailwind imports in CSS. If the project isn't Vue + Tailwind, ask the user to confirm before proceeding — the skill's output assumptions won't hold.
 
-3. **Playwright MCP is available (required for Step 5 only).** Check for a Playwright browser tool in the tool list. Steps 1–4 proceed without it; the visual match loop cannot. If it's absent when Step 5 begins, tell the user to install it (add `@playwright/mcp` to the MCP config and restart) — do not fall back to asking the user to paste screenshots.
+3. **Playwright MCP is available (required for the visual match loop).** Check for a Playwright browser tool in the tool list. Phase A of the loop runs interleaved into Step 4 (per component, right after each build); Phase B runs in Step 5. Steps 1–3 proceed without Playwright, and Step 4 can build while deferring Phase A to Step 5. If it's still absent when matching begins, tell the user to install it (add `@playwright/mcp` to the MCP config and restart) — do not fall back to asking the user to paste screenshots.
 
 ## The 5-step workflow
 
@@ -107,6 +107,8 @@ Before writing any code, produce a structural outline:
   - Slots (if any)
   - Top-level template structure (just the element tree, no classes yet)
   - Dependencies on other new components
+
+  Design each component's API with the **`web-component-design` skill's** principles: semantic prop names with sensible defaults, variants as typed props (not boolean explosions), slots over props for content injection, compound components (provide/inject) when children share state. A Figma `Component` node is a reusable API, not a one-off page partial.
 - **Existing components to reuse** — first call `get_code_connect_map` on the in-scope nodes: where the team maintains Code Connect, it maps Figma components straight to the code component that implements them — deterministic, no grep-and-hope. For nodes it doesn't cover, scan the project by name/shape. Don't rebuild a Button if `components/ui/Button.vue` already exists. List matches with their source (Code Connect vs manual scan).
 - **Component variants** — for any Figma `Component` that belongs to a component **set** (has variants), pull the variant definitions via `get_design_context` on the set. Hover / disabled / active / size variants are *in the file* — enumerate them as real prop values; don't dump them into open questions as if unknown.
 - **Open questions** — only genuinely absent info: states not drawn anywhere in Figma, loading/empty states, keyboard behavior, responsive rules between the frames captured in step 1.
@@ -145,11 +147,14 @@ After loading, generate the Vue SFCs following the conventions from that file pl
 
 **Assets:** export the step-1 asset inventory via `download_assets` (SVG for icons/vectors, PNG for raster) into the project's assets dir, and reference the real files. Never leave an icon as a placeholder comment or approximate it with an emoji/box.
 
+**Build by component, bottom-up.** Order the step-3 file list by dependency: leaf components first, composites next, the page/view last. Each Figma `Component` node becomes a self-contained reusable SFC with the API designed in step 3 (composition patterns per the **`web-component-design` skill**) — never page markup to be split up later.
+
 **After writing each file:**
 1. Run the project's linter (`npm run lint`, `pnpm lint`, or whatever the package.json defines)
 2. Run a typecheck if TS (`vue-tsc --noEmit` or `npm run typecheck`)
 3. If either fails, fix before moving to the next file
-4. Report the final diff and any proposed `tailwind.config.js` additions separately — the user applies config changes themselves
+4. **Run this component's Phase A visual match (step 5) before building the next component** — build → match → next, so a drifted leaf never gets composed into parents. If the dev server or Playwright isn't up yet, defer its Phase A to step 5 and flag the deferral.
+5. Report the final diff and any proposed `tailwind.config.js` additions separately — the user applies config changes themselves
 
 ### Step 5: Visual match loop
 
@@ -158,6 +163,20 @@ Only after the build step is complete and the files pass lint/typecheck.
 **Requires the Playwright MCP** (see Prerequisites) and a **running dev server**. Ask the user once for the base dev URL and the route for each built view — e.g. `http://localhost:5173/checkout`. Do not infer routes from the router config.
 
 > **The rule: no screen may be marked `✓ matched` without a written itemized diff table whose HIGH/MEDIUM rows are all resolved.** A visual glance, structural presence (correct component, correct column names), or "looks right" is explicitly not sufficient. The table is the gate.
+
+**The loop runs in two phases: Phase A per component, then Phase B per page.** Phase A normally runs **interleaved with step 4** — each component is matched right after it's built (build → match → next). At step 5, run Phase A only for components whose match was deferred or is still unmatched, then run Phase B. Phase B starts only when every component is `✓ matched` or reported blocked — component drift caught in isolation never reaches the page compare.
+
+#### Phase A: per-component loop
+
+Iterate over **every SFC built in step 4** that maps to a Figma `Component` / `Instance` node (the step-1 hierarchy marks them; pair each file to its node ID from the step-3 outline).
+
+1. **Target** — Figma `get_screenshot` of that Component node (the component alone, not the parent frame).
+2. **Actual** — via Playwright on the live page where the component renders: set the viewport to the Figma frame width, locate the component's **root element** and screenshot just that element (element screenshot, not full page). Use a stable selector for the root; if none exists, add a `data-figma-node="<nodeId>"` attribute to the SFC root and select on that.
+3. **Compare** — same measure-then-table gate as Phase B below (steps 3–5), asserting only against that component's match-spec entries. Same tolerances, same H/M verdict gate, same forbidden arbitrary values.
+4. **Interactive states live here** — drive each Figma-drawn variant (hover, focus, disabled, selected …) on the isolated element and compare against the matching variant node, per Phase B step 6.
+5. **No iteration cap.** Loop until the component's table has **zero H/M rows** — exact per the measured tolerances, not a pixel diff. The only exits besides `✓ matched (N iterations)` are a named blocker (missing token, font) or the no-progress stop below.
+
+#### Phase B: per-page loop
 
 Run this loop **per page**:
 
@@ -175,19 +194,19 @@ Run this loop **per page**:
    *Optional (L-rows only):* an automated pixel diff (`pixelmatch`, `odiff`) between the two screenshots catches sub-pixel cosmetic drift faster than eyeballing. It does **not** replace the table — H/M rows are judged by measured Figma values, not pixel deltas.
 4. **Verdict — gated on the table.** `✓ matched` is allowed ONLY when the table has **zero HIGH and zero MEDIUM rows**. Any H or M row ⇒ verdict is `⚠ not matched`; fix and re-screenshot. A page with no written table cannot be marked matched at all. Reusing the correct component is **not** a match — "right mechanism" ≠ "matches the design".
 5. **Otherwise (any H/M row)** → fix the `.vue`/Tailwind to close it, using values from Figma or the step-2 mapping only (never invented to "look about right"). If the page reuses a component, diff that component's *built-in* styling (header fill, alignment, footers, default column widths) against Figma too — differences are H/M rows, not "close enough". Re-run lint + typecheck, then re-screenshot and re-compare.
-6. **Interactive states — verify every drawn variant, not just the resting state.** For each state the component set defines in Figma (hover, focus, active, disabled, selected — enumerated in the step-3 outline), drive it in Playwright (`page.hover`, force `:focus`, set the `disabled` prop / `aria-disabled`, etc.), `get_screenshot` the matching Figma variant node, and run the same measure-then-table compare (step 3) for that state. A resting-state match with a broken hover/disabled state is `⚠ not matched`. Skip only states Figma never drew.
-7. **Cap at 10 iterations per page.** If the page still doesn't match after 10 rounds, stop and report the remaining diffs with their probable cause — do not keep looping.
+6. **Interactive states — verify every drawn variant, not just the resting state.** For each state the component set defines in Figma (hover, focus, active, disabled, selected — enumerated in the step-3 outline), drive it in Playwright (`page.hover`, force `:focus`, set the `disabled` prop / `aria-disabled`, etc.), `get_screenshot` the matching Figma variant node, and run the same measure-then-table compare (step 3) for that state. A resting-state match with a broken hover/disabled state is `⚠ not matched`. Skip only states Figma never drew — and states already `✓ matched` per component in Phase A (re-check only page-level states, e.g. a row hover that spans multiple components).
+7. **No iteration cap.** Keep looping until the table has **zero H/M rows** — exact match means every measured assertion within tolerance, not a pixel-identical diff image. The only legitimate early exits are a named blocker (missing token, font) or the no-progress stop in the guard rails — report either with the remaining diffs and their probable cause.
 
 **Guard rails — these keep the loop from rotting the codebase:**
 
 - **Never emit an arbitrary Tailwind value to force a pixel match.** `p-[17px]`, `bg-[#hex]`, `text-[15px]` are forbidden mid-loop exactly as they are in the build step. If closing a diff requires a value with no token, flag it as a blocker and stop chasing that diff — do not hack in the arbitrary class.
-- **No-progress detection.** If an iteration's diff list is the same as the previous iteration's, stop early — do not spend the remaining rounds spinning on a diff you can't close.
+- **No-progress detection.** If an iteration's diff list is the same as the previous iteration's, stop and report — with no iteration cap this is the backstop that keeps the loop from spinning forever on a diff it can't close.
 - **Named false-diff sources — report, never loop on them:** a font not loaded in the local dev environment, real/live data vs Figma placeholder text, or a mid-animation frame. These are environment mismatches, not code bugs. **Layout, size, and color diffs are never "noise"** — do not wave them away as environment; they are always real H/M rows.
 - **Fresh eyes are mandatory — the builder's own "matched" doesn't count.** The agent that wrote the code is biased toward declaring it done, especially under pressure to show progress. The step-3 compare MUST run as a **separate subagent that never saw the build** — hand it only the Figma match-spec (step 1), the target `get_screenshot`, and the page URL, and tell it to assume the render is wrong until the numbers prove otherwise. The builder does not mark its own work matched. Treat every diff the verifier returns as real until a measurement closes it. "Looks matched to me" is exactly the failure this loop exists to catch.
 
 **Regression case this gate exists to prevent:** a full-bleed Figma table (frame at `x=0`) rendered as a centered `max-w-[1400px] mx-auto`, with guessed narrow column widths and 1 seeded row instead of 6 — all declared `✓ matched` with no diff table written. That verdict is now impossible: the missing table blocks the verdict outright, and full-bleed→centered, wrong column widths, and 6→1 row count are each HIGH rows that force `⚠ not matched`.
 
-**Output** — per page: `✓ matched (N iterations)` or `⚠ remaining diffs after 10` followed by the diff list and any token/font blockers. As everywhere else in this skill: do not silently "fix" a discrepancy that stems from the design being wrong — report it and let the user decide whether the code or the design is off.
+**Output** — per component (Phase A), then per page (Phase B): `✓ matched (N iterations)` or `⚠ blocked / no progress` followed by the diff list and any token/font blockers. As everywhere else in this skill: do not silently "fix" a discrepancy that stems from the design being wrong — report it and let the user decide whether the code or the design is off.
 
 ## When the user wants to skip steps
 
@@ -212,7 +231,7 @@ Each step produces a clearly-labeled section in the response:
 **STOP — approve before I build.**
 ```
 
-Step 4 outputs the code files directly via the file-writing tools, with a summary of what was created. Step 5 outputs a per-page match report (`✓ matched (N iterations)` or `⚠ remaining diffs after 10` + blockers).
+Step 4 outputs the code files directly via the file-writing tools, with a summary of what was created. Step 5 outputs a per-component match report (Phase A), then a per-page match report (Phase B) — each `✓ matched (N iterations)` or `⚠ blocked / no progress` + blockers.
 
 ## Reference files
 
