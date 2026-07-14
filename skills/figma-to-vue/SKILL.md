@@ -145,7 +145,7 @@ After loading, generate the Vue SFCs following the conventions from that file pl
 - Figma padding → `p-N` or `px-N py-N` or `pt-N pr-N pb-N pl-N` based on whether values are symmetric
 - Figma alignment → `justify-*` (primary axis) + `items-*` (counter axis)
 
-**Assets:** export the step-1 asset inventory via `download_assets` (SVG for icons/vectors, PNG for raster) into the project's assets dir, and reference the real files. Never leave an icon as a placeholder comment or approximate it with an emoji/box.
+**Assets:** export the step-1 asset inventory via `download_assets` (SVG for icons/vectors, PNG for raster) into the project's assets dir, and reference the real files. Never leave an icon as a placeholder comment or approximate it with an emoji/box. **Never substitute a visually-similar icon** from an icon library (lucide, heroicons, project icon set) by eye — a lookalike is not the icon. Use a library icon only when the step-3 reuse mapping (Code Connect or an existing component) explicitly maps that node to it; otherwise the exported SVG from the exact node ID is the icon.
 
 **Build by component, bottom-up.** Order the step-3 file list by dependency: leaf components first, composites next, the page/view last. Each Figma `Component` node becomes a self-contained reusable SFC with the API designed in step 3 (composition patterns per the **`web-component-design` skill**) — never page markup to be split up later.
 
@@ -199,6 +199,7 @@ Run this loop **per page**:
 
 **Guard rails — these keep the loop from rotting the codebase:**
 
+- **Icon/image diffs are asset diffs, never style diffs.** A wrong-looking icon is not fixed by eyeballing paths, tweaking size, or swapping in a similar library icon — re-export the SVG/PNG via `download_assets` from that node's ID in the step-1 §7 inventory and replace the file. The compare for an icon is: (a) rendered asset **is** the exported file for that node ID, (b) rendered size/color match the spec. Redrawing or approximating a vector by eye is banned.
 - **Never emit an arbitrary Tailwind value to force a pixel match.** `p-[17px]`, `bg-[#hex]`, `text-[15px]` are forbidden mid-loop exactly as they are in the build step. If closing a diff requires a value with no token, flag it as a blocker and stop chasing that diff — do not hack in the arbitrary class.
 - **No-progress detection.** If an iteration's diff list is the same as the previous iteration's, stop and report — with no iteration cap this is the backstop that keeps the loop from spinning forever on a diff it can't close.
 - **Named false-diff sources — report, never loop on them:** a font not loaded in the local dev environment, real/live data vs Figma placeholder text, or a mid-animation frame. These are environment mismatches, not code bugs. **Layout, size, and color diffs are never "noise"** — do not wave them away as environment; they are always real H/M rows.
