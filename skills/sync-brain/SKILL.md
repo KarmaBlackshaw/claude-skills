@@ -39,10 +39,15 @@ The `obsidian-recall.sh` SessionStart hook already auto-pulls; use this for a ma
 
 ### `push`
 Persist this session's outcome. Default target is the **spoke** (`ACTIVE_CONTEXT`). The **hub** (`LEARNINGS`) is a small curated set — not a dump. Most sessions add nothing to it. Nothing important is lost on rotation because the two things worth keeping have durable homes: **learnings** graduate to the hub (gate below), and **follow-ups** land in the **THREADS ledger**.
-1. Read the current `ACTIVE_CONTEXT` and the `THREADS` ledger.
-2. Insert a new entry at the top of the Sessions list (newest first) using the **Session-End Template** below. If a Stop-hook checkpoint handed you a `<!-- session: <id> -->` marker, end the entry with that exact line — the checkpoint greps for it to verify the write landed (no marker → it nudges again).
-3. **Thread ledger — follow-ups survive rotation.** For every follow-up in the new entry, add an `open` row to the `THREADS` ledger; flip any thread you resolved this session to `done`. An open item then lives in the ledger independently of the session entry that spawned it, so dropping that entry later never loses it. The recall hook injects the ledger's `open` rows every session start.
-4. **Rotation:** keep the last 5 session entries. When you drop an older one, its follow-ups are already in the ledger (nothing to salvage) — only run its **Learnings** through the Promotion gate before deleting.
+1. Insert a new entry at the top of the Sessions list (newest first) using the **Session-End Template** below (a single ≤12-word headline line). **Do this with one shell command, not the Edit tool** — an Edit renders a diff block in the chat, which the user does not want to see. Prepend under the `## Sessions (newest first)` line:
+
+   ```bash
+   S="$(grep -m1 '^ACTIVE_CONTEXT=' CLAUDE.local.md | cut -d= -f2-)"; awk -v h="### $(date +%F) — <HEADLINE>" -v m='<!-- session: <id> -->' '{print} /^## Sessions \(newest first\)/&&!d{print ""; print h; print m; d=1}' "$S" > "$S.tmp" && mv "$S.tmp" "$S"
+   ```
+
+   If a Stop-hook checkpoint handed you a `<!-- session: <id> -->` marker, use it (the checkpoint greps for it to verify the write landed). After the command, print only `Saved.`.
+2. **No rotation by default.** Entries are one line each, so the spoke grows slowly; leave old entries in place. <!-- ponytail: the recall hook injects the whole spoke every session, so this grows context ~1 line/session — a far ceiling. If it ever bloats, add a trim to the awk command (keep newest ~20 `### ` blocks). -->
+3. **Optional — only if it matters:** if a follow-up genuinely needs to survive, append one `open` row to the `THREADS` ledger the same one-command way. Skip otherwise.
 
 **Promotion gate — most takeaways NEVER reach the hub.** Promote to `LEARNINGS` only if ALL hold:
 - **Reusable** beyond this one session — you'd genuinely apply it again.
@@ -61,18 +66,20 @@ A takeaway failing any gate stays in `ACTIVE_CONTEXT`. Stack-specific lessons (S
 
 **Soft cap.** If a spoke's `##` area passes ~15–20 lessons or reads noisy, merge related `###` subsections into one sharper lesson (merge the bodies, collapse their index lines).
 
-5. Write the session **spoke** (`ACTIVE_CONTEXT`), the `THREADS` ledger, any promoted lesson(s) in their **domain spoke**, and the hub index. Confirm in one line exactly what you saved: the session entry, ledger rows opened/closed, and any lessons added or refined.
+4. Only if a lesson passed the Promotion gate above: write it to its domain spoke + refresh the hub index (an Edit is fine here — promotion is rare and worth seeing). Otherwise there is nothing else to write. Either way, your ONLY visible output is the single word `Saved.` (or `Nothing to save.` if the session was trivial/read-only) — no summary, no counts, no narration of these steps.
 
 ## Session-End Template
 
+A short headline — **≤ 12 words, one clause**. No bullet block, no semicolons, no "and… and…" chaining, no parenthetical detail. Just the single most important thing that changed. The durable detail lives elsewhere (follow-ups → THREADS ledger, learnings → the hub via the Promotion gate), so the entry is only a title:
+
 ```markdown
-### YYYY-MM-DD — <short title>
-- **What:** <what changed this session — features, fixes, refactors>
-- **Why:** <the reasoning / root cause, not just the what>
-- **Architecture:** <structural decisions or new patterns, if any>
-- **Learnings:** <optional — leave blank if none; only promote to [[Learnings]] via the push Promotion gate>
-- **Follow-ups:** <open threads for next session, if any — each one also becomes an `open` row in the THREADS ledger>
+### YYYY-MM-DD — <≤12-word headline>
 ```
+
+Good: `### 2026-07-17 — Collapse header arrow-circle into one IconArrowCircle SVG`
+Too long: `### 2026-07-17 — Collapsed arrow-circle into IconArrowCircle SVG (ring+arrow, filled prop…); deleted TheHeaderArrowCircle, moved color to text-* at 4 call sites, typecheck clean`
+
+If a Stop-hook checkpoint handed you a `<!-- session: <id> -->` marker, put it on the next line so the checkpoint can verify the write landed.
 
 ## Threads-Ledger Template (`THREADS` — `<repo> — Threads.md`)
 

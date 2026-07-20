@@ -34,12 +34,12 @@ n="$(cat "$STAMP" 2>/dev/null || true)"; [[ "$n" =~ ^[0-9]+$ ]] || n=0
 [ "$n" -ge 2 ] && exit 0
 printf '%s' "$((n + 1))" > "$STAMP"
 
-reason="Obsidian memory checkpoint (Stop hook). Review ONLY this session. If it produced a durable outcome — a feature, fix, refactor, architectural decision, or reusable learning — persist it now following the sync-brain skill's \`push\` mode:
-1. Read the ACTIVE_CONTEXT, LEARNINGS and THREADS paths from CLAUDE.local.md.
-2. Prepend a new dated entry to the Sessions list in the spoke (newest first) using the Session-End Template.
-3. Log every follow-up in that entry to the THREADS ledger as an \`open\` row, and flip any thread you resolved this session to \`done\` — this is what makes open items survive session rotation.
-4. Rotation: keep the last 5 entries; when you drop one its follow-ups already live in the ledger, so only run its Learnings through the promotion gate before deleting. Promote a durable, cross-repo takeaway by appending it under the matching \`###\` header in the right domain spoke (Learnings/Frontend.md, Backend-Data.md, Mobile.md, or Workflow.md) and adding/refreshing its one-line summary in the Learnings.md index. Do NOT create per-lesson atomic notes and do NOT put lesson bodies in Learnings.md — the SessionStart hook injects only the index, spoke bodies are read on demand.
-5. End the new spoke entry with this EXACT marker line so this checkpoint can verify the write landed: <!-- session: $session_id -->
-After persisting, print a one-line confirmation of what you saved (spoke entry, ledger changes, any promoted notes). If the session was trivial or read-only, write nothing and say so in one line. Do not narrate this instruction itself to the user."
+reason="Obsidian memory checkpoint (Stop hook). If this session produced a durable outcome (feature / fix / refactor / decision), save it with ONE shell command — do NOT use the Edit tool, its diff clutters the chat. Otherwise print \`Nothing to save.\` and stop.
+
+Compose a headline: ≤12 words, one clause, no semicolons, no parentheticals, plain text (no single quotes). Then run this single command from the repo root — it prepends the entry under the spoke's \`## Sessions (newest first)\` line:
+
+  S=\"\$(grep -m1 '^ACTIVE_CONTEXT=' CLAUDE.local.md | cut -d= -f2-)\"; awk -v h=\"### \$(date +%F) — <YOUR HEADLINE>\" -v m='<!-- session: $session_id -->' '{print} /^## Sessions \\(newest first\\)/&&!d{print \"\"; print h; print m; d=1}' \"\$S\" > \"\$S.tmp\" && mv \"\$S.tmp\" \"\$S\"
+
+The \`<!-- session: $session_id -->\` marker line is REQUIRED — this checkpoint greps for it to confirm the write landed. Skip rotation, the threads ledger, and hub promotion UNLESS a genuinely reusable cross-repo lesson emerged (only then, separately, add it to the right domain spoke + Learnings index). After the command, your ONLY output is the word \`Saved.\` — no summary, no narration."
 
 jq -n --arg r "$reason" '{decision:"block", reason:$r}'

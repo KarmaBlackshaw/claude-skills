@@ -1,0 +1,46 @@
+# sprint-release-cherry-pick — configuration
+# Copy this file to `config.yaml` (same folder) and fill in your values.
+# config.yaml is gitignored — keep workspace/space ids and org here, not in the skill body.
+
+clickup:
+  # Team/workspace id (the number in a ClickUp URL: app.clickup.com/<workspace_id>/...).
+  workspace_id: "REPLACE_ME"
+
+  # Space or folder that holds your sprint lists. The skill walks this to find the active sprint.
+  sprint_space_id: "REPLACE_ME"
+
+  # How to pick the current sprint:
+  #   by_status → the sprint List/Folder flagged active / "in progress".
+  active_sprint: by_status
+
+  # The ticket status to release. Default is the real release gate.
+  # For a test run, set this to a staging status, e.g. "Ready for Testing - Staging",
+  # so you can rehearse the whole flow without touching real release work.
+  ticket_status: "Ready for Release"
+
+github:
+  # GitHub org/owner that hosts the repos.
+  org: your-org
+
+  # Branch every release branch is cut from AND merged back into.
+  base_branch: qa
+
+  # Release branch = <prefix><YYYY-MM-DD>, e.g. qa-claude-2026-07-16. Same name across all repos in one run.
+  release_branch_prefix: "qa-claude-"
+
+  # Where the repos are cloned locally ( ~ expands to $HOME ).
+  local_root: "~/code"
+
+  # The repos to release into. A ticket routes to whichever repo actually holds its linked branch.
+  repos:
+    - patient-onboarding-frontend
+    - patient-dashboard-frontend
+    - doctor-dashboard-frontend
+    - admin-dashboard-frontend
+
+pr:
+  # PR base branch (usually the same as github.base_branch).
+  base: qa
+
+  # Title template. Tokens: {date} {sprint} {ticket_status}
+  title_template: "Release {date}: {sprint} — {ticket_status}"

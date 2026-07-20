@@ -21,3 +21,6 @@ mnt/
 
 # Claude local memory pointer (machine-specific Obsidian paths)
 CLAUDE.local.md
+
+# Skill runtime config (machine-specific ids/org — copied from *.example.yaml)
+skills/*/config.yaml
