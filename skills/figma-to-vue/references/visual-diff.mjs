@@ -2,8 +2,9 @@
 // usage: node visual-diff.mjs <target.png> <actual.png> <outDir> [sensitivity] [closeRatio]
 //   sensitivity: pixelmatch per-pixel color threshold, 0..1 (default 0.1 — higher = more AA-tolerant)
 //   closeRatio : max fraction of differing pixels to count as "pixel-close" (default 0.005 = 0.5%)
-// deps: pixelmatch + pngjs. If missing:
-//   npx --yes --package pixelmatch --package pngjs node visual-diff.mjs <args>
+// deps: pixelmatch + pngjs. Run from a dir whose node_modules has both — simplest is
+// the Vue project root (copy this file there). If missing: npm i -D pixelmatch pngjs.
+// Note: `npx --package` does NOT expose modules to an outside-path script — don't use it.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { PNG } from 'pngjs';
 import pixelmatch from 'pixelmatch';
