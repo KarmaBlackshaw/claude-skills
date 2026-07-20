@@ -98,32 +98,50 @@ Only after step 3 is approved.
 
 Only after build passes lint/typecheck. Requires Playwright + a **running dev server**. Ask the user once for the base URL + route per view (`http://localhost:5173/checkout`) — never infer routes from the router.
 
-**The two-gate rule.** No screen is `✓ matched` until BOTH pass: (1) an itemized diff table with **zero HIGH/MEDIUM rows**, and (2) the pixel-diff ratio is **`pixelClose: true`**. A visual glance, "looks right", or correct-component/correct-structure is not sufficient. The table catches wrong tokens/structure the pixels would let slide; the ratio catches visual drift no measured field covers.
+**The two-gate rule.** No screen is `✓ matched` until BOTH pass: (1) an itemized diff table with **zero HIGH/MEDIUM rows**, and (2) the pixel diff is clean — **`pixelClose: true` AND `localized: false`**. A visual glance, "looks right", or correct-component/correct-structure is not sufficient. The table catches wrong tokens/structure the pixels would let slide; `pixelClose` catches whole-image drift no measured field covers; `localized` catches a small but wrong element (a swapped icon, an off-color chip) that's too few pixels to move the global ratio.
 
 **Two phases:** Phase A per component (normally interleaved with step 4), then Phase B per page. Phase B starts only when every component is `✓ matched` or reported blocked.
 
-### The gate (run this on every target — component in A, page in B)
+**The loop (per target) — two subagents, never the same one:**
+
+```
+get target image → develop → qa → fail? ─(findings back to develop)─┐
+                      ▲                                              │
+                      └──────────────────────────────────────────────┘
+                                    qa passes? → done ✓ matched
+```
+
+- **develop** — the builder subagent. Writes/fixes the `.vue` + Tailwind using Figma + step-2 mapping values **only**. First pass builds from the step-3 outline; every later pass consumes the qa findings and re-develops. Owns all edits; **never marks its own work matched**.
+- **qa** — the gate (this *is* the "match" — one comparison, no separate step). A **fresh-eyes subagent that never saw the build**, read-only, handed only the match-spec, the target `get_screenshot`, and the URL. Runs the gate below, returns a **verdict + findings**, and **never edits code**. A **new qa spawns each iteration** — it never sees prior fixes.
+
+On `fail`, qa returns its findings to develop; develop fixes and re-lints/re-typechecks; a **fresh qa** re-runs the gate. On `done` (verdict `✓ matched`), stop.
+
+### The gate (qa runs this on every target — component in A, page in B)
 
 1. **Target** — `get_screenshot` of the node.
-2. **Actual** — via Playwright: set viewport to the Figma frame width and `deviceScaleFactor` to the export scale (usually 2) so target/actual share pixel dimensions. Screenshot the matched element (Phase A: the component's root, not the parent; Phase B: the page). Use a stable selector; if none, add `data-figma-node="<nodeId>"` to the SFC root and select on it.
+2. **Actual — deterministic capture.** Via Playwright: set viewport to the Figma frame width and `deviceScaleFactor` to the export scale (usually 2) so target/actual share pixel dimensions. Screenshot the matched element (Phase A: the component's root, not the parent; Phase B: the page). Use a stable selector; if none, add `data-figma-node="<nodeId>"` to the SFC root and select on it. **Before the screenshot, kill non-layout variance or it reads as drift** (these are the "named false-diff sources" — remove them, don't tolerate them):
+   - `await page.evaluate(() => document.fonts.ready)` — an unswapped webfont is the #1 false diff.
+   - Inject `* { animation: none !important; transition: none !important; caret-color: transparent !important; }` and pass `screenshot({ animations: 'disabled' })` — no mid-animation frame, no blinking caret.
+   - **Seed the element with the exact Figma copy** (from the step-1 report) so a text-region diff means layout drift, not placeholder-vs-live text.
+   - **Mask genuinely dynamic regions** (dates, avatars, random data) with `screenshot({ mask: [...] })` so they can't inflate the ratio.
 3. **Measure, then table — numbers first, eye second.** Pull computed styles (`getComputedStyle`: padding, gap, `font-size`, `line-height`, `font-weight`, `color`, `width`, `border-radius`) and assert each against the step-1 match-spec. Tolerances: **spacing exact, sizing ±1px, color exact** (compare as `rgb()`). Every out-of-tolerance field is an **automatic diff row — the eye gets no vote on numbers.** Then write the table, seeded with failed assertions + visual-only aspects (missing/extra element, wrong image/icon):
 
    | # | Aspect | Figma | Render | Impact (H/M/L) |
    |---|--------|-------|--------|----------------|
 
    Walk *every* aspect explicitly — one you don't write a row for is one you didn't check: overall width (full-bleed vs centered), container max-width, column count + each width, row count, row/cell height, header alignment + fill, footers/toolbars, toggles, headings, page background, plus spacing, typography, radius, shadow. **H** = wrong layout/size/structure/color a user sees; **M** = off-by-a-token spacing/size/weight; **L** = sub-pixel/AA.
-4. **Side-by-side pixel diff (required).** Run `references/visual-diff.mjs target.png actual.png <outDir>` → writes `side-by-side.png` (`target | actual | diff`) + prints `{ ratio, pixelClose }`. **View `side-by-side.png`** — the red panel points at what's off; seed a row for every visual-only diff it exposes. A `sizeMismatch` = wrong viewport/scale, fix that first.
-5. **Verdict.** `✓ matched` only if **zero H/M rows AND `pixelClose`**. Any H/M row or not-pixel-close ⇒ `⚠ not matched`: fix the `.vue`/Tailwind using Figma/mapping values only, re-lint + re-typecheck, re-screenshot. No written table or no pixel run ⇒ can't be marked matched at all.
+4. **Side-by-side pixel diff (required).** Run `references/visual-diff.mjs target.png actual.png <outDir>` → writes `side-by-side.png` (`target | actual | diff`) + prints `{ ratio, pixelClose, maxCluster, localized }`. **View `side-by-side.png`** — the red panel points at what's off; seed a row for every visual-only diff it exposes. A `sizeMismatch` = wrong viewport/scale, fix that first. **`localized: true`** = a concentrated diff cluster at `maxCluster.box` (`[x,y,w,h]`) — a small but real defect the global `ratio` hides, so it's an **automatic HIGH row**; look at that box in the diff panel and name what's wrong there.
+5. **Verdict (qa returns it — qa never fixes).** `✓ matched` only if **zero H/M rows AND `pixelClose` AND not `localized`** → `done`. Any H/M row, not-pixel-close, or `localized` ⇒ `⚠ not matched`: qa hands the table + findings back to **develop**, which fixes the `.vue`/Tailwind using Figma/mapping values only and re-lints + re-typechecks; then a **fresh qa** re-runs this gate. No written table or no pixel run ⇒ can't be marked matched at all.
 6. **Interactive states.** For each state the Figma set draws (hover/focus/active/disabled/selected, enumerated in step 3), drive it in Playwright, `get_screenshot` the matching variant node, and re-run this gate for that state. A resting match with a broken hover/disabled is `⚠ not matched`. Phase A owns per-component states; Phase B re-checks only page-level states (e.g. a row hover spanning components).
-7. **No iteration cap.** Loop until zero H/M rows AND `pixelClose`. Only exits: a named blocker (missing token/font) or the no-progress stop.
+7. **No iteration cap.** Loop until zero H/M rows AND `pixelClose` AND not `localized`. Only exits: a named blocker (missing token/font) or the no-progress stop.
 
 ### Guard rails
 
 - **Icon/image diffs are asset diffs, never style diffs.** Don't eyeball paths, tweak size, or swap a similar icon — re-export via `download_assets` from the node ID in §7 and replace the file. Compare = rendered asset **is** that node's export + size/color match spec.
 - **Never emit an arbitrary value to force a pixel match** (Core rule 2). If closing a diff needs a token-less value, flag it as a blocker and stop chasing that diff.
 - **No-progress stop.** If both the diff list **and** the pixel ratio are unchanged from the prior iteration, stop and report. A dropping ratio is progress; a stuck one with an unchanged table is not.
-- **Named false-diff sources — report, never loop:** font not loaded locally, live vs Figma placeholder data, mid-animation frame. These are environment mismatches. **Layout/size/color diffs are never "noise"** — always real H/M rows.
-- **Fresh eyes are mandatory.** The compare runs as a **separate subagent that never saw the build** — hand it only the match-spec, the target `get_screenshot`, and the URL, and tell it to assume the render is wrong until numbers prove otherwise. The builder never marks its own work matched.
+- **False-diff sources are eliminated at capture, not tolerated in the loop.** Unloaded font, mid-animation frame, blinking caret, placeholder-vs-live copy, and dynamic data are all removed by the deterministic capture in gate step 2 (`fonts.ready`, animations off, seeded copy, masked regions). If one still shows, fix the *capture*, don't excuse the diff. **Layout/size/color diffs are never "noise"** — always real H/M rows.
+- **Fresh eyes are mandatory.** qa is a separate subagent that never saw the build and never persists across iterations (see **The loop** above) — tell it to assume the render is wrong until numbers prove otherwise. develop never QAs its own work; qa never edits.
 
 The gate exists to make this impossible: a full-bleed table (frame at `x=0`) rendered as centered `max-w-[1400px] mx-auto` with guessed column widths and 1 row instead of 6, declared `✓ matched` with no table. Now the missing table blocks the verdict and each of those is a HIGH row.
 
