@@ -16,6 +16,17 @@ The default failure mode is optimistic pattern-matching — eyeball the frame, g
 3. **Run all 5 steps in order. Never skip step 1.** Pause for explicit user approval after step 3, before any code.
 4. **Report design bugs, don't silently fix them.** A discrepancy that stems from the design being wrong is reported — the user decides code vs design.
 
+## Orchestration — runs under `architect`
+
+This skill always runs under the **`architect`** lead. Architect owns the plan and delegates the keystrokes; it never edits source itself. **Architect decides which fields to spawn** — it engages only the roles the design needs (a lone button won't pull the whole team), partitions files so no two workers collide, and sequences dependencies. The agents below are the roles it can draw on — the existing jeash team, referenced here, not redefined; the step→agent lines are the default routing, not a mandatory pipeline.
+
+- **Steps 1–3 (inspect → map → outline)** — architect runs directly; they're read-only planning, and it holds the step-3 STOP-for-approval gate. When the design leans on semantics or a11y (interactive controls, lists, nav, headings), architect pulls **`ux`** into the step-1 map so semantic elements and roles/labels are specified *before* any code.
+- **Step 4 (build)** — architect delegates each Figma `Component` to the **`frontend`** agent, one SFC per worker, files partitioned so no two touch the same file. Build bottom-up (leaves → composites → page) still holds; architect sequences the dependencies.
+- **Step 5 (visual-match loop)** — architect drives the loop and spawns the two roles as real agents (see the mapping in step 5): **`develop` = `frontend`**, **`qa` = `qa`** (fresh-eyes, never edits). A fresh `qa` spawns each iteration.
+- **After the build** — architect routes the SFCs through **`review`** for a multi-lens read, then splits its findings into partitioned fix-assignments to whichever fields own them: **`frontend`** UI/behavior, **`dx`** code-quality (collapse the near-duplicate SFCs a leaf-by-leaf build produces into shared components/composables, tighten types, delete dead flexibility), **`ux`** semantics/a11y (div-soup → real `<button>`/`<nav>`/`<ul>`, roles/labels, focus order — the rendering-changing fixes `dx` won't make). `qa` is the final gate.
+
+Only the lead session orchestrates the team, so architect must be the lead — not itself a delegated subagent.
+
 ## Prerequisites
 
 | Need | Check | If missing |
@@ -102,7 +113,7 @@ Only after build passes lint/typecheck. Requires Playwright + a **running dev se
 
 **Two phases:** Phase A per component (normally interleaved with step 4), then Phase B per page. Phase B starts only when every component is `✓ matched` or reported blocked.
 
-**The loop (per target) — two subagents, never the same one:**
+**The loop (per target) — two subagents, never the same one** (architect spawns them: **`develop` = the `frontend` agent**, **`qa` = the `qa` agent**):
 
 ```
 get target image → develop → qa → fail? ─(findings back to develop)─┐
