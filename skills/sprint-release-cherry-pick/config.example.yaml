@@ -4,19 +4,8 @@
 
 clickup:
   # Team/workspace id (the number in a ClickUp URL: app.clickup.com/<workspace_id>/...).
+  # Needed to resolve pasted custom ticket ids (e.g. CU-123).
   workspace_id: "REPLACE_ME"
-
-  # Space or folder that holds your sprint lists. The skill walks this to find the active sprint.
-  sprint_space_id: "REPLACE_ME"
-
-  # How to pick the current sprint:
-  #   by_status → the sprint List/Folder flagged active / "in progress".
-  active_sprint: by_status
-
-  # The ticket status to release. Default is the real release gate.
-  # For a test run, set this to a staging status, e.g. "Ready for Testing - Staging",
-  # so you can rehearse the whole flow without touching real release work.
-  ticket_status: "Ready for Release"
 
 github:
   # GitHub org/owner that hosts the repos.
@@ -42,5 +31,5 @@ pr:
   # PR base branch (usually the same as github.base_branch).
   base: qa
 
-  # Title template. Tokens: {date} {sprint} {ticket_status}
-  title_template: "Release {date}: {sprint} — {ticket_status}"
+  # Title template. Tokens: {date}
+  title_template: "Release {date}"
