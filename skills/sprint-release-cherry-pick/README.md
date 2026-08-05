@@ -1,6 +1,6 @@
 # sprint-release-cherry-pick
 
-Cut a QA release from **pasted ClickUp tickets**. Paste the tickets to release, and it resolves each ticket's linked GitHub branch/commits, and — per repo — cuts `qa-claude-<date>` off `qa`, cherry-picks the commits onto it, and opens a PR back into `qa`.
+Cut a QA release from **pasted ClickUp tickets**. Paste the tickets to release, and it resolves each ticket's linked GitHub branch/commits, and — per repo — cuts `qa-release-<date>` off `qa`, cherry-picks the commits onto it, and opens a PR back into `qa`.
 
 Built for a 4-repo setup (`doctor-dashboard`, `admin-dashboard`, `patient-dashboard`, `patient-portal`), but the repo list and org live in `config.yaml` — retarget by editing config.
 
@@ -46,7 +46,7 @@ To rehearse safely, paste staging tickets — the flow runs end-to-end without t
 ## Safety
 
 - **Confirm gate:** no branch/push/PR before you approve the dry-run.
-- **Idempotent:** a pre-existing `qa-claude-<date>` branch stops that repo rather than duplicating commits.
+- **Idempotent:** a pre-existing `qa-release-<date>` branch stops that repo rather than duplicating commits.
 - **No silent drops:** tickets whose branch can't be resolved ride through to the report as `UNRESOLVED`.
 - **One PR per repo:** four separate repos can't share a PR.
 

@@ -1,11 +1,11 @@
 ---
 name: sprint-release-cherry-pick
-description: Use when cutting a QA release from pasted ClickUp tickets — the user says "cut the release", "sprint release", "release these tickets", "cherry-pick these tickets", or pastes ClickUp ticket links/ids to be turned into fresh qa-based branches with their commits cherry-picked and PRs opened. Resolves each ticket's linked GitHub branch/commits, and per repo cuts a qa-claude-<date> branch off qa, cherry-picks the commits, and opens a PR into qa. Requires config.yaml.
+description: Use when cutting a QA release from pasted ClickUp tickets — the user says "cut the release", "sprint release", "release these tickets", "cherry-pick these tickets", or pastes ClickUp ticket links/ids to be turned into fresh qa-based branches with their commits cherry-picked and PRs opened. Resolves each ticket's linked GitHub branch/commits, and per repo cuts a qa-release-<date> branch off qa, cherry-picks the commits, and opens a PR into qa. Requires config.yaml.
 ---
 
 # Sprint Release Cherry-Pick
 
-Turn the ClickUp tickets the operator pastes into per-repo release branches: for each repo, cut `qa-claude-<date>` off `qa`, cherry-pick the tickets' commits onto it, and open a PR back into `qa`.
+Turn the ClickUp tickets the operator pastes into per-repo release branches: for each repo, cut `qa-release-<date>` off `qa`, cherry-pick the tickets' commits onto it, and open a PR back into `qa`.
 
 **Never mutate a real repo (branch, push, PR) before the operator approves the dry-run plan.** Read freely; write only after the confirm gate in Phase 4.
 
@@ -26,7 +26,7 @@ clickup:
 github:
   org: your-org
   base_branch: qa
-  release_branch_prefix: "qa-claude-"
+  release_branch_prefix: "qa-release-"
   local_root: "~/code"
   repos: [doctor-dashboard, admin-dashboard, patient-dashboard, patient-portal]
 pr:
@@ -40,7 +40,7 @@ Create one todo per phase. Do them in order. Do not skip the dry-run gate.
 
 ### Phase 1 — Load config
 
-Read `config.yaml`. Resolve `local_root` (`~` → `$HOME`). Compute the release branch name once: `<release_branch_prefix><today>` where `today = $(date +%F)` (e.g. `qa-claude-2026-07-16`). Use the SAME name for every repo this run.
+Read `config.yaml`. Resolve `local_root` (`~` → `$HOME`). Compute the release branch name once: `<release_branch_prefix><today>` where `today = $(date +%F)` (e.g. `qa-release-2026-07-16`). Use the SAME name for every repo this run.
 
 ### Phase 2 — Collect the pasted tickets
 
@@ -54,7 +54,9 @@ ClickUp's GitHub integration attaches linked **branches and commits** to a task.
 
 1. **Read the linked branch + commits from ClickUp** — inspect the task (`clickup_get_task`; also check custom fields, attachments, and comments — the integration surfaces branch/commit data in varying places). Record the branch name and any commit SHAs ClickUp reports, plus which repo they belong to.
 2. **Fallback if ClickUp returns nothing** — grep each repo's remote branches for the ticket's id: `git -C <repo> ls-remote --heads origin | grep -i <ticket-id>`. A branch whose name embeds the ticket id is the linked branch.
-3. **Route to a repo** — the repo is whichever of `github.repos` actually contains that branch. A ticket may touch more than one repo; handle each repo hit independently.
+
+   **Match by ticket id ONLY — never by feature keywords.** A branch resolves to a ticket by exactly two means: (a) ClickUp's linked branch, or (b) the ticket **id** appearing in the branch name. Do NOT grep for words from the ticket's title/feature (e.g. `upsell`, `renewal`, `refill`) and do NOT treat a semantically-related branch as a candidate. If neither (a) nor (b) matches in a repo, that repo simply has no branch for this ticket — move on. If no repo matches at all, mark the ticket **UNRESOLVED**; never substitute a guessed-related branch.
+3. **Route to a repo** — the repo is whichever of `github.repos` actually contains that id-matched branch. A ticket may touch more than one repo; handle each repo hit independently — but a "hit" is only an id/linked match (step 2), not a keyword resemblance.
 4. **Git-verify the branch** (do NOT trust ClickUp's name blindly): `git -C <repo> fetch origin` then confirm `origin/<branch>` exists. If ClickUp's branch name is stale/renamed/deleted, fall back to the id-grep from step 2; if still unresolved, mark the ticket **UNRESOLVED** and carry it into the dry-run report rather than silently dropping it.
 5. **Compute the commits to pick** — the commits unique to the branch vs. qa, in chronological order:
    `git -C <repo> rev-list --reverse origin/<base_branch>..origin/<branch>`.
@@ -67,12 +69,12 @@ ClickUp's GitHub integration attaches linked **branches and commits** to a task.
 Print a plan, grouped by repo:
 
 ```
-doctor-dashboard  →  qa-claude-2026-07-16  (off origin/qa)
+doctor-dashboard  →  qa-release-2026-07-16  (off origin/qa)
   tickets: CU-123 "Fix X", CU-140 "Add Y"
   commits (in order):
     a1b2c3d  fix: X null guard
     d4e5f6a  feat: Y panel
-admin-dashboard   →  qa-claude-2026-07-16
+admin-dashboard   →  qa-release-2026-07-16
   ...
 UNRESOLVED: CU-155 "Z" — no linked branch found in any repo
 Skipped repos: patient-portal (no tickets)
@@ -103,12 +105,13 @@ When `git cherry-pick` reports a conflict, **invoke the `resolving-merge-conflic
 
 ### Phase 7 — Report
 
-Summarize: per repo — branch created, commits picked, PR url; any conflicts resolved; any UNRESOLVED tickets or skipped repos. Surface anything the operator must follow up on (unresolved tickets, discrepant SHAs, skipped repos).
+Summarize: per repo — branch created, commits picked, PR url; any conflicts resolved; any UNRESOLVED tickets or skipped repos. Surface anything the operator must follow up on (unresolved tickets, discrepant SHAs, skipped repos). **Report only facts about the pasted tickets and their id/linked branches** — do NOT surface unrelated or keyword-similar branches as suggested follow-ups.
 
 ## Guardrails
 
 - **Config-driven, never hardcoded.** Org, repos, base branch all come from `config.yaml`.
 - **Confirm gate is mandatory.** No branch/push/PR before Phase 4 approval.
-- **Idempotent.** A pre-existing `qa-claude-<date>` branch means the run already happened — stop for that repo, don't duplicate commits.
+- **Idempotent.** A pre-existing `qa-release-<date>` branch means the run already happened — stop for that repo, don't duplicate commits.
 - **Never drop a ticket silently.** Unresolved tickets ride through to the report.
+- **Match by id/linked branch only.** Resolve a ticket's branch solely via ClickUp's linked branch or the ticket id in the branch name — never keyword/feature-name matching. No branch → UNRESOLVED, not a guess.
 - **Read is free, write is gated.** Fetching, listing, and diffing need no approval; branching/pushing/PRs do.

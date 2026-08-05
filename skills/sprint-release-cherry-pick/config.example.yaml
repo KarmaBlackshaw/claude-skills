@@ -14,8 +14,8 @@ github:
   # Branch every release branch is cut from AND merged back into.
   base_branch: qa
 
-  # Release branch = <prefix><YYYY-MM-DD>, e.g. qa-claude-2026-07-16. Same name across all repos in one run.
-  release_branch_prefix: "qa-claude-"
+  # Release branch = <prefix><YYYY-MM-DD>, e.g. qa-release-2026-07-16. Same name across all repos in one run.
+  release_branch_prefix: "qa-release-"
 
   # Where the repos are cloned locally ( ~ expands to $HOME ).
   local_root: "~/code"
