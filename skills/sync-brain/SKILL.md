@@ -39,13 +39,13 @@ The `obsidian-recall.sh` SessionStart hook already auto-pulls; use this for a ma
 
 ### `push`
 Persist this session's outcome. Default target is the **spoke** (`ACTIVE_CONTEXT`). The **hub** (`LEARNINGS`) is a small curated set — not a dump. Most sessions add nothing to it. Nothing important is lost on rotation because the two things worth keeping have durable homes: **learnings** graduate to the hub (gate below), and **follow-ups** land in the **THREADS ledger**.
-1. Insert a new entry at the top of the Sessions list (newest first) using the **Session-End Template** below (a single ≤12-word headline line). **Do this with one shell command, not the Edit tool** — an Edit renders a diff block in the chat, which the user does not want to see. Prepend under the `## Sessions (newest first)` line:
+1. **Upsert** this session's entry in the Sessions list (newest first) using the **Session-End Template** below (a single ≤12-word headline line). **Do this with one shell command, not the Edit tool** — an Edit renders a diff block in the chat, which the user does not want to see. The command is a single upsert keyed on the `<!-- session: <id> -->` marker: if that marker already exists (you saved earlier this session, now correcting the headline), it replaces the `### ` headline line above the marker in place; otherwise it prepends a new entry under the `## Sessions (newest first)` line:
 
    ```bash
-   S="$(grep -m1 '^ACTIVE_CONTEXT=' CLAUDE.local.md | cut -d= -f2-)"; awk -v h="### $(date +%F) — <HEADLINE>" -v m='<!-- session: <id> -->' '{print} /^## Sessions \(newest first\)/&&!d{print ""; print h; print m; d=1}' "$S" > "$S.tmp" && mv "$S.tmp" "$S"
+   S="$(grep -m1 '^ACTIVE_CONTEXT=' CLAUDE.local.md | cut -d= -f2-)"; awk -v h="### $(date +%F) — <HEADLINE>" -v m='<!-- session: <id> -->' '{a[NR]=$0} $0==m{seen=1} /^## Sessions \(newest first\)/{hdr=NR} END{if(seen){for(i=1;i<=NR;i++){if(a[i+1]==m&&a[i]~/^### /)a[i]=h; print a[i]}}else{for(i=1;i<=NR;i++){print a[i]; if(i==hdr){print ""; print h; print m}}}}' "$S" > "$S.tmp" && mv "$S.tmp" "$S"
    ```
 
-   If a Stop-hook checkpoint handed you a `<!-- session: <id> -->` marker, use it (the checkpoint greps for it to verify the write landed). After the command, print only `Saved.`.
+   If a Stop-hook checkpoint handed you a `<!-- session: <id> -->` marker, use it (the checkpoint greps for it to verify the write landed). Re-running with the same marker updates the existing headline in place instead of duplicating — so a corrected outcome overwrites the first pass. After the command, print only `Saved.`.
 2. **No rotation by default.** Entries are one line each, so the spoke grows slowly; leave old entries in place. <!-- ponytail: the recall hook injects the whole spoke every session, so this grows context ~1 line/session — a far ceiling. If it ever bloats, add a trim to the awk command (keep newest ~20 `### ` blocks). -->
 3. **Optional — only if it matters:** if a follow-up genuinely needs to survive, append one `open` row to the `THREADS` ledger the same one-command way. Skip otherwise.
 

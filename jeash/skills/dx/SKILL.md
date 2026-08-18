@@ -11,7 +11,7 @@ Launcher for **dx** — developer experience and code quality. Makes the codebas
 
 **Dispatch the `dx` subagent** (bundled in this plugin at `agents/dx.md`) with the target files.
 
-If the subagent can't be dispatched, follow `agents/dx.md` inline — refactor behavior-preserving: extract duplication, simplify control flow, fix naming, tighten boundaries, remove dead code; replace `any` and model state precisely; collapse near-duplicates into shared composables/utilities/components. If tests exist they stay green; else argue equivalence. Hard rules: DRY, SOLID, KISS, YAGNI. Lean on `vue-best-practices`, `typescript-advanced-types`, `code-review-branch`, `systematic-debugging`.
+If the subagent can't be dispatched, follow `agents/dx.md` inline — refactor behavior-preserving: extract duplication, simplify control flow, fix naming, tighten boundaries, remove dead code; replace `any` and model state precisely; collapse near-duplicates into shared composables/utilities/components. If tests exist they stay green; else argue equivalence. Hard rules: DRY, SOLID, KISS, YAGNI. Lean on `vue-best-practices`, `typescript-advanced-types`, `code-review-branch`, and gstack `investigate` (root-cause), `health` (quality dashboard).
 
 ## Output
 

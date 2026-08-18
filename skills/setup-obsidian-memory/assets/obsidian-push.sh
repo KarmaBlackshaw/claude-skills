@@ -1,4 +1,9 @@
 #!/usr/bin/env bash
+# RETIRED 2026-08-09 — unregistered from settings.local.json. Superseded by the
+# capture/synthesis pipeline: obsidian-capture.sh (SessionEnd) queues the session
+# and obsidian-drain.sh (SessionStart) synthesizes it out-of-band. Kept for
+# rollback: re-add the Stop hook entry to restore the old inline-push behavior.
+#
 # Stop hook: nudge the model to persist this session to the Obsidian vault via
 # the sync-brain skill's push mode, then VERIFY the write actually landed.
 # Only fires when this repo is wired to a vault (CLAUDE.local.md present).
@@ -36,9 +41,9 @@ printf '%s' "$((n + 1))" > "$STAMP"
 
 reason="Obsidian memory checkpoint (Stop hook). If this session produced a durable outcome (feature / fix / refactor / decision), save it with ONE shell command — do NOT use the Edit tool, its diff clutters the chat. Otherwise print \`Nothing to save.\` and stop.
 
-Compose a headline: ≤12 words, one clause, no semicolons, no parentheticals, plain text (no single quotes). Then run this single command from the repo root — it prepends the entry under the spoke's \`## Sessions (newest first)\` line:
+Compose a headline: ≤12 words, one clause, no semicolons, no parentheticals, plain text (no single quotes). Then run this single command from the repo root — it upserts this session's entry keyed on the marker: a new entry prepended under the spoke's \`## Sessions (newest first)\` line, or if you already saved this session, the existing headline replaced in place (correction overwrites the first pass, no duplicate):
 
-  S=\"\$(grep -m1 '^ACTIVE_CONTEXT=' CLAUDE.local.md | cut -d= -f2-)\"; awk -v h=\"### \$(date +%F) — <YOUR HEADLINE>\" -v m='<!-- session: $session_id -->' '{print} /^## Sessions \\(newest first\\)/&&!d{print \"\"; print h; print m; d=1}' \"\$S\" > \"\$S.tmp\" && mv \"\$S.tmp\" \"\$S\"
+  S=\"\$(grep -m1 '^ACTIVE_CONTEXT=' CLAUDE.local.md | cut -d= -f2-)\"; awk -v h=\"### \$(date +%F) — <YOUR HEADLINE>\" -v m='<!-- session: $session_id -->' '{a[NR]=\$0} \$0==m{seen=1} /^## Sessions \\(newest first\\)/{hdr=NR} END{if(seen){for(i=1;i<=NR;i++){if(a[i+1]==m&&a[i]~/^### /)a[i]=h; print a[i]}}else{for(i=1;i<=NR;i++){print a[i]; if(i==hdr){print \"\"; print h; print m}}}}' \"\$S\" > \"\$S.tmp\" && mv \"\$S.tmp\" \"\$S\"
 
 The \`<!-- session: $session_id -->\` marker line is REQUIRED — this checkpoint greps for it to confirm the write landed. Skip rotation, the threads ledger, and hub promotion UNLESS a genuinely reusable cross-repo lesson emerged (only then, separately, add it to the right domain spoke + Learnings index). After the command, your ONLY output is the word \`Saved.\` — no summary, no narration."
 

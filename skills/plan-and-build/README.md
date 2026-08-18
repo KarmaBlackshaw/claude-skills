@@ -10,9 +10,13 @@ files in parallel, **debugging to root cause** and claiming done only **with ver
 evidence**. QA always verifies with **two verdicts (spec + code-quality)**. A retro agent
 promotes what it learned to **Obsidian long-term memory** so the next run is smarter.
 
-Four superpowers-style disciplines are ported in, self-contained (no plugin dependency):
-skills-first, **design-before-build**, **root-cause debugging**, **evidence-before-claims**.
-Commit/finishing-branch is deliberately excluded — committing stays the user's call.
+**Requires [gstack](https://github.com/gstack).** The disciplines run on gstack skills —
+**design-before-build** (`spec`), **plan review** (`autoplan`), **root-cause debugging**
+(`investigate`), **runtime + multi-lens QA** (`qa` / `browse` / `review` / `design-review` /
+`health`). Two disciplines with no gstack owner stay local ports: **skills-first**
+(`using-skills.md`) and **evidence-before-claims** (`verifying.md`). Phase 0 preflights for
+gstack and halts if it's missing. Commit/ship is deliberately excluded — committing stays the
+user's call.
 
 No git worktrees — parallel safety comes from the architect giving each builder a
 **disjoint** set of files.
@@ -23,10 +27,10 @@ No git worktrees — parallel safety comes from the architect giving each builde
 plan-and-build/
 ├── SKILL.md               # orchestrator — the 7-phase loop + dispatch templates
 ├── README.md              # you are here
-├── using-skills.md        # ported: skill-discovery discipline
-├── brainstorming.md       # ported: design-before-build (scaled), Phase 1
-├── systematic-debugging.md# ported: root cause before any fix, Phases 4–5
-├── verifying.md           # ported: no completion claim without fresh evidence
+├── using-skills.md        # local port: skill-discovery discipline (no gstack owner)
+├── verifying.md           # local port: no completion claim without fresh evidence (no gstack owner)
+│                          # design/debug/QA disciplines now come from gstack: spec, autoplan,
+│                          # investigate, qa/browse/review/design-review/health (see SKILL.md table)
 ├── lessons.md             # legacy local memory + write fallback (memory is Obsidian now)
 ├── spec-template.md       # the per-component spec the architect fills
 └── agents/
@@ -89,11 +93,12 @@ Phase 0 so nothing is stranded) and the **write fallback** when no vault is conf
 
 **Required companions:** `sync-brain` (runtime read/write) and `setup-obsidian-memory` (wiring).
 
-## Skill discovery (no plugin dependency)
+## Skill discovery
 
 `using-skills.md` is a self-contained port of the "invoke relevant skills before acting"
-discipline. The orchestrator and agents follow it without depending on any external plugin.
-It deliberately carries **no auto-commit behavior** — committing stays the user's call.
+discipline — the one discipline with no gstack owner, so it stays local. The orchestrator and
+agents follow it. It deliberately carries **no auto-commit behavior** — committing stays the
+user's call.
 
 ## Why this exists
 
@@ -102,7 +107,7 @@ It deliberately carries **no auto-commit behavior** — committing stays the use
 - **Spec per component** — auditable artifact; builders never guess from a half-remembered prompt.
 - **Builder model is per-component**, routed by complexity tag — cheap work stays cheap.
 - **QA always runs**; **Retro always runs** — the pipeline compounds knowledge over time.
-- **Superpowers disciplines, ported in** — design-before-build, root-cause debugging, and evidence-before-claims raise quality without depending on the superpowers plugin.
+- **Disciplines come from gstack** — design-before-build (`spec`), plan review (`autoplan`), root-cause debugging (`investigate`), and runtime + multi-lens QA (`qa`/`browse`/`review`/`design-review`/`health`) raise quality; the pipeline requires gstack (Phase 0 preflights).
 - **No auto-commit, no test files** — ship the change; the human commits when ready.
 
 ## Trigger phrases

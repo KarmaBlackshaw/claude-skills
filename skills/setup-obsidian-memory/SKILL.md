@@ -5,9 +5,13 @@ description: Use when wiring a repository into an Obsidian hub-and-spoke long-te
 
 # Setup Obsidian Memory
 
-Bootstraps hub-and-spoke long-term memory into the **current repo**: a shared Obsidian vault (`Learnings.md` hub + per-repo `Active Context.md` spoke), a gitignored `CLAUDE.local.md` path pointer, an auto-pull SessionStart hook, and an auto-push Stop hook.
+Bootstraps hub-and-spoke long-term memory into the **current repo**: a shared Obsidian vault (`Learnings.md` hub + per-repo `Active Context.md` spoke), a gitignored `CLAUDE.local.md` path pointer, and the **machine-global memory hooks** — a SessionStart recall + drain and a SessionEnd capture — that persist and synthesize sessions.
 
 **Core principle:** the vault paths live in ONE gitignored file (`CLAUDE.local.md`); hooks and the runtime skill grep them from there. Nothing committed or published ever hardcodes a personal path.
+
+**Install model — global, wired per-repo by the pointer.** The hook scripts live in ONE place (`~/.claude/hooks/`) and are registered ONCE in `~/.claude/settings.json`. Every hook no-ops instantly unless the session's repo has a `CLAUDE.local.md`, so a repo is "wired" purely by that pointer file existing — no per-repo scripts, no per-repo registration, no drift. (Older installs put a copy of the scripts in each repo's `.claude/`; `migrate-to-global.sh` retires those — see **Updating an existing install**.)
+
+**Capture/synthesis pipeline (replaces the old Stop-hook push).** `obsidian-capture.sh` (SessionEnd) queues the finished session into `~/.claude/sync-brain/queue/` and kicks a detached `obsidian-drain.sh`; the drain synthesizes each queued session out-of-band via a headless `claude` run that writes the spoke, then archives it. Editorial judgment (headline / learnings) is out of the hot path, so there is no "correction not saved" problem. `obsidian-push.sh` is retired.
 
 **REQUIRED COMPANION:** the `sync-brain` skill does the runtime read/write. This skill only wires the plumbing. If `~/.claude/skills/sync-brain/` is missing, tell the user to install it (same agentic-ai skills repo) before relying on push/pull.
 
@@ -25,10 +29,11 @@ Bootstraps hub-and-spoke long-term memory into the **current repo**: a shared Ob
 | `<vault>/Projects/<repo>/<repo>.md` | This repo's session-log spoke — the **folder-note** (frontmatter-tagged `project/<repo>`); its sibling conventions note is `<repo> — Coding Rules.md` |
 | `<vault>/Projects/<repo>/<repo> — Threads.md` | This repo's **open-threads ledger** — durable follow-ups that survive session rotation (recall injects the `open` rows) |
 | `<vault>/.obsidian/graph.json` | Graph view config: tag nodes on + color groups (created once per vault, only if absent) |
-| `<repo>/CLAUDE.local.md` | **gitignored** — declares the vault paths (single source of truth) |
-| `<repo>/.claude/hooks/obsidian-recall.sh` | SessionStart → injects memory into context |
-| `<repo>/.claude/hooks/obsidian-push.sh` | Stop → nudges the model to run `/sync-brain push` |
-| `<repo>/.claude/settings.local.json` | registers both hooks |
+| `<repo>/CLAUDE.local.md` | **gitignored** — declares the vault paths (single source of truth); its presence is what wires the repo |
+| `~/.claude/hooks/obsidian-recall.sh` | SessionStart → injects memory into context (skips `compact`) |
+| `~/.claude/hooks/obsidian-capture.sh` | SessionEnd → queues the session + kicks the drain |
+| `~/.claude/hooks/obsidian-drain.sh` | SessionStart (async catch-up) + detached from capture → synthesizes queued sessions into their spoke |
+| `~/.claude/settings.json` | registers all three, once, machine-wide |
 
 Assets referenced below (`assets/…`) live in this skill's base directory (shown when the skill loads). Set `SKILL_DIR` to that path.
 
@@ -69,11 +74,11 @@ Create `$REPO/CLAUDE.local.md` from the **Pointer seed** below, substituting the
 git -C "$REPO" check-ignore CLAUDE.local.md >/dev/null 2>&1 || printf '\n# Claude local memory pointer (machine-specific Obsidian paths)\nCLAUDE.local.md\n' >> "$REPO/.gitignore"
 ```
 
-### 6. Install + register the hooks (idempotent)
+### 6. Ensure the global hooks are installed (once per machine)
 ```bash
-bash "$SKILL_DIR/assets/sync-hooks.sh" "$REPO"
+bash "$SKILL_DIR/assets/sync-hooks.sh"
 ```
-One command: copies the current `obsidian-recall.sh` + `obsidian-push.sh` into `$REPO/.claude/hooks/`, then merges SessionStart(obsidian-recall) + Stop(obsidian-push) into `settings.local.json` only if absent. Settings are never edited by hand. Safe to re-run — this is also how you propagate a later hook change (see **Updating an existing install**).
+One command, no repo arg: copies the current `obsidian-recall.sh` + `obsidian-capture.sh` + `obsidian-drain.sh` into `~/.claude/hooks/` and merges the three hooks into `~/.claude/settings.json` only if absent. Idempotent — a no-op if already installed. Because wiring is by `CLAUDE.local.md` presence, once this has run once the repo you just pointed (Step 4) is already wired; there is nothing per-repo to install. Settings are never edited by hand.
 
 ### 7. Conflict check (critical)
 A Stop/PostCompact hook that does `cat >` on a vault file will **clobber** the spoke on every fire. Scan both settings for one:
@@ -85,9 +90,11 @@ If found, warn the user and offer to retire it (unregister + note the backup). M
 ### 8. Verify + finish
 ```bash
 export CLAUDE_PROJECT_DIR="$REPO"
-jq empty "$REPO/.claude/settings.local.json" && echo "settings valid"
-echo '{"stop_hook_active":false}' | bash "$REPO/.claude/hooks/obsidian-push.sh" | jq -e '.decision=="block"' >/dev/null && echo "push hook ok"
-bash "$REPO/.claude/hooks/obsidian-recall.sh" SessionStart | jq -e '.hookSpecificOutput.additionalContext' >/dev/null && echo "recall hook ok"
+jq empty "$HOME/.claude/settings.json" && echo "global settings valid"
+bash "$HOME/.claude/hooks/obsidian-recall.sh" SessionStart | jq -e '.hookSpecificOutput.additionalContext' >/dev/null && echo "recall hook ok"
+# capture queues this repo (uses a throwaway session id + SYNC_BRAIN_NO_SPAWN so no drain fires)
+printf '{"cwd":"%s","session_id":"verify-x","transcript_path":""}' "$REPO" | SYNC_BRAIN_NO_SPAWN=1 bash "$HOME/.claude/hooks/obsidian-capture.sh" \
+  && [ -f "$HOME/.claude/sync-brain/queue/verify-x.meta" ] && echo "capture hook ok" && rm -f "$HOME/.claude/sync-brain/queue/verify-x.meta"
 git -C "$REPO" check-ignore CLAUDE.local.md >/dev/null && echo "pointer gitignored"
 ```
 Then tell the user: **fully restart Claude Code** (quit, not just close the window) — hooks load at session start.
@@ -203,13 +210,20 @@ THREADS=<vault>/Projects/<repo>/<repo> — Threads.md
 The Obsidian graph can't label edges. Spokes are **folder-notes** (`Projects/<repo>/<repo>.md`) so each is uniquely named + labeled, and `[[<repo>]]` links resolve without ambiguity. On top of that, every note under `Projects/<repo>/` (the spoke `<repo>.md`, `<repo> — Coding Rules.md`, `Memory.md` + `Memory/*`) carries a nested `project/<repo>` frontmatter tag: with `showTags` on that tag becomes one hub node per project and its facts orbit it. Global `Learnings/` notes stay **untagged by project on purpose** — they're cross-repo and hub to `[[Learnings]]`. The seeded `graph.json` color-codes four categories: lessons (`path:"Learnings/"`), **spokes** (`path:"Projects/" -file:"Coding Rules" -path:Memory` — folder-notes share no filename token, so match by path minus the other two), conventions (`file:"Coding Rules"`), project facts (`path:Memory`). To back-fill tags on an already-populated vault, add `project/<slug>` to each note's `tags:` (idempotent: skip if present; drop a redundant bare `<slug>` tag).
 
 ## Updating an existing install
-Changed a hook (e.g. the recall/push scripts)? Propagate it to every wired repo with **no manual copying** — `sync-hooks.sh` is idempotent (re-copies the current hooks, re-registers only if missing):
+Changed a hook script? There's one copy now — re-run `sync-hooks.sh` once and every wired repo picks it up next session (idempotent: re-copies the current scripts to `~/.claude/hooks/`, re-registers only if missing):
 ```bash
-for repo in <wired-repo-roots…>; do
-  bash "$SKILL_DIR/assets/sync-hooks.sh" "$repo"
+bash "$SKILL_DIR/assets/sync-hooks.sh"
+```
+
+### Migrating a legacy per-repo install to global
+Older installs copied the scripts into each repo's `.claude/hooks/` and registered them in that repo's `settings.local.json`. Once the global hooks exist, those repos would fire the hooks **twice** per event. Retire the per-repo copies with `migrate-to-global.sh` (backs up each `settings.local.json`, strips only the obsidian hook entries, deletes the local scripts — everything else untouched):
+```bash
+bash "$SKILL_DIR/assets/sync-hooks.sh"                       # install global once
+for repo in $(find "$HOME/Documents" -maxdepth 4 -path '*/.claude/hooks/obsidian-recall.sh' | sed 's:/.claude/hooks/obsidian-recall.sh::'); do
+  bash "$SKILL_DIR/assets/migrate-to-global.sh" "$repo"
 done
 ```
-Find wired repos with `find <dir> -maxdepth 2 -name CLAUDE.local.md`. Settings never need hand-editing: registration lives in the per-machine, gitignored `settings.local.json` and is handled by the script; the committed `settings.json` is intentionally left untouched so the memory hooks are never forced on teammates who clone the repo.
+Find wired repos by installed hook (`find … -path '*/.claude/hooks/obsidian-recall.sh'`) or pointer (`find <dir> -maxdepth 2 -name CLAUDE.local.md`).
 
 ## Maintenance
 
@@ -235,3 +249,4 @@ Mechanically folds a repo's native memory store into its Obsidian spoke (routes 
 | Non-idempotent re-runs | Guard settings + gitignore edits (the provided scripts already do) |
 | A hook present on disk but unregistered | Present ≠ wired — always run the Verify step |
 | A `cat >` memory-write hook | It clobbers the note; must append (Step 7) |
+| Global reg + leftover per-repo reg | Fires hooks twice per event — run `migrate-to-global.sh` on legacy repos |

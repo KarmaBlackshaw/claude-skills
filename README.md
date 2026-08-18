@@ -10,7 +10,9 @@ A personal collection of [Claude Code](https://docs.claude.com/en/docs/claude-co
 | [`plan-and-build`](./skills/plan-and-build) | Two-phase feature workflow — opus planner writes a markdown plan, user approves, then sonnet/haiku/opus executors implement step-by-step, routed by complexity tag. No auto-commit. No test-file writes. Bundles 4 subagents (planner + 3 executors). |
 | [`tailwind-color-token`](./skills/tailwind-color-token) | Converts arbitrary hex color values to named Tailwind design tokens. Checks `tailwind.config.js` before asking, batches multiple new hexes, inserts tokens into `theme.extend.colors`, and rewrites the raw hex in code. |
 
-> The `jeash:*` launcher skills (architect, frontend, ux, dx, review, qa) live in the **`jeash` plugin** ([`./jeash/`](./jeash/)) — invoke as `jeash:review`, `jeash:qa`, … The portable agent roster source is in [`./agents/`](./agents/).
+> The `jeash:*` launcher skills (architect, frontend, ux, dx, review, qa) live in the **`jeash` plugin** ([`./jeash/`](./jeash/)) — invoke as `jeash:review`, `jeash:qa`, … The plugin bundles the agent roster at [`./jeash/agents/`](./jeash/agents/) (single source of truth) and installs via the plugin marketplace.
+
+> **Requires [gstack](https://github.com/gstack).** The `plan-and-build` skill and the `jeash` agents now depend on gstack skills at runtime (`spec`, `autoplan`, `investigate`, `qa`/`browse`, `review`, `design-review`, `health`). Install gstack before using them — the pipeline preflights for it and halts if it's missing.
 
 More skills coming as I build them.
 

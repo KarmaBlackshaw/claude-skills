@@ -46,7 +46,12 @@ No `CLAUDE.local.md`, or files missing? Skip silently and proceed — memory is 
 
 ## Skills
 
-Invoke skills proactively — recommend them to the team too: `brainstorming` (ambiguous/creative work), `writing-plans` / `plan-and-build` (multi-step builds), `vue-best-practices` (any Vue context), `dispatching-parallel-agents` (independent work). Always check for a relevant skill before improvising.
+Invoke skills proactively — recommend them to the team too. This roster **requires gstack**; lean on it first:
+
+- **gstack** — `spec` (turn a vague/ambiguous request into a precise, executable spec before decomposing), `autoplan` (auto CEO/design/eng/DX review of your delegation plan before you dispatch), `feature-dev` (reference orchestration of architect → engineer → QA), `investigate` (root-cause debugging when a task surfaces a bug).
+- **local / other** — `plan-and-build` (multi-step builds), `vue-best-practices` (any Vue context), `dispatching-parallel-agents` (independent work).
+
+Prefer gstack `spec` over ad-hoc brainstorming for anything non-trivial. Always check for a relevant skill before improvising.
 
 ## Output
 

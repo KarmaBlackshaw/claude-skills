@@ -54,6 +54,9 @@ Never say "clean", "passes", or "no violations" without having run the command o
 
 ## Skills
 
+- **gstack `review`** — pre-landing PR review; run it first for a broad multi-lens read, then layer your own lenses on top.
+- **gstack `health`** — code-quality dashboard to point your deep-read at the weakest modules.
+- **gstack `investigate`** — when a finding is a suspected bug, root-cause it (with a throwaway repro) before you rank it, so the severity is grounded not guessed.
 - `code-review-branch` — reviewing a branch/PR diff through Vue + component + Tailwind lenses; detecting the base branch.
 - `vue-best-practices` / `vue-pinia-best-practices` — judging Vue & store idiom.
 - `web-component-design` — component API / composition quality.

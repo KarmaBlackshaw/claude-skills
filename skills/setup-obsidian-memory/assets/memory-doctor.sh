@@ -129,11 +129,46 @@ sort -u "$work/dead" | sed 's/^/  /' | head -40
 [ "$ndead" -gt 40 ] && echo "  … ($((ndead-40)) more)"
 echo
 
+# ── 5. Sync-brain queue health ───────────────────────────────────────
+# The vault checks above never look at the capture/drain pipeline; a stuck queue
+# leaks memory silently. Count the dirs, flag rows too old and rows that can
+# never synthesize (transcript pruned AND hedge gone — H1's fail-fast targets).
+SB="${SYNC_BRAIN_HOME:-$HOME/.claude/sync-brain}"
+STALE_DAYS="${SYNC_BRAIN_STALE_DAYS:-3}"
+nqueued=0; ndone=0; nfailed=0; nqold=0; nunrec=0
+if [ -d "$SB" ]; then
+  nqueued=$(find "$SB/queue"  -name '*.meta' 2>/dev/null | wc -l | tr -d ' ')
+  ndone=$(  find "$SB/done"   -name '*.meta' 2>/dev/null | wc -l | tr -d ' ')
+  nfailed=$(find "$SB/failed" -name '*.meta' 2>/dev/null | wc -l | tr -d ' ')
+  echo "── 5. Sync-brain queue: queued=$nqueued done=$ndone failed=$nfailed ──"
+  if [ -d "$SB/queue" ]; then
+    while IFS= read -r -d '' m; do
+      echo "  stale queued (>${STALE_DAYS}d): $(basename "$m" .meta)"; nqold=$((nqold+1))
+    done < <(find "$SB/queue" -name '*.meta' -mtime +"$STALE_DAYS" -print0 2>/dev/null)
+    for m in "$SB/queue"/*.meta; do
+      [ -e "$m" ] || continue
+      sid=$(grep -m1 '^session_id=' "$m" | cut -d= -f2-)
+      tp=$( grep -m1 '^transcript=' "$m" | cut -d= -f2-)
+      [ -f "$SB/queue/$sid.jsonl" ] && continue          # pruning hedge still present
+      [ -n "$tp" ] && [ -f "$tp" ] && continue           # live transcript still present
+      echo "  UNRECOVERABLE (no transcript, no hedge): ${sid:-$(basename "$m" .meta)}"; nunrec=$((nunrec+1))
+    done
+  fi
+  if [ -f "$SB/drain.log" ]; then
+    echo "  drain.log (last 5):"
+    tail -n 5 "$SB/drain.log" 2>/dev/null | sed 's/^/    /'
+  fi
+else
+  echo "── 5. Sync-brain queue: (no $SB — pipeline not installed) ──"
+fi
+echo
+
 # ── Summary / exit ───────────────────────────────────────────────────
 echo "── summary ──"
 echo "  broken links: $nbroken | stale: $nstale | orphans: $norphan | dead-refs: $ndead"
-if [ "$nbroken" -gt 0 ] || [ "$norphan" -gt 0 ]; then
-  echo "  ✗ actionable issues found (broken links / orphans)"
+echo "  queue: queued=$nqueued done=$ndone failed=$nfailed | stale-queued: $nqold | unrecoverable: $nunrec"
+if [ "$nbroken" -gt 0 ] || [ "$norphan" -gt 0 ] || [ "$nunrec" -gt 0 ]; then
+  echo "  ✗ actionable issues found (broken links / orphans / unrecoverable queue rows)"
   exit 1
 fi
 echo "  ✓ no actionable issues (stale/dead-refs are advisory)"

@@ -6,6 +6,11 @@
 # Arg $1 = hook event name (default: SessionStart).
 set -euo pipefail
 
+# The drain spawns a headless `claude` to synthesize a queued session; that run
+# fires SessionStart too. It doesn't need memory injected to write a 12-word
+# summary — skip the whole blob so synthesis stays cheap.
+[ -n "${SYNC_BRAIN_SYNTH:-}" ] && exit 0
+
 EVENT="${1:-SessionStart}"
 ROOT="${CLAUDE_PROJECT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
 PTR="$ROOT/CLAUDE.local.md"

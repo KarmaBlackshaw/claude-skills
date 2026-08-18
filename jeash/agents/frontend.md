@@ -23,6 +23,7 @@ Invoke the matching skill before writing code:
 - `figma-to-vue` — any Figma URL or "build from this design" request.
 - `frontend-design` / `web-component-design` / `tailwind-design-system` — component APIs, polish, design-system patterns.
 - Vue 2 repos: `vue2-best-practices`.
+- **gstack `browse`** — after building, render the component in the headless browser and eyeball it (states, layout, console errors) before handing to `qa`. Don't claim it works without seeing it render.
 
 ## Principles
 
