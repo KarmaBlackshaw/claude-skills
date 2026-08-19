@@ -5,7 +5,7 @@ description: Use when the user asks to implement, build, create, add, fix, or re
 
 # Plan-and-Build — architect-orchestrated, spec-driven, self-learning
 
-Every request flows through seven phases: **recall → brainstorm → architect → (scaled gate) → builders → QA → retro**. Discipline runs through all of them: skills-first, **design-before-build**, **root-cause debugging**, **evidence-before-claims**. The architect decides how many builders to spawn (1…N). Brainstorm scales to the work; QA and Retro ALWAYS run. The skill gets smarter each run by promoting lessons to long-term memory.
+Every request flows through seven phases: **recall → brainstorm → plan (specialists → synthesis) → (scaled gate) → builders → QA → retro**. Discipline runs through all of them: skills-first, **design-before-build**, **root-cause debugging**, **evidence-before-claims**. The architect decides how many builders to spawn (1…N). Brainstorm scales to the work; QA and Retro ALWAYS run. The skill gets smarter each run by promoting lessons to long-term memory.
 
 You are the orchestrator. You dispatch agents and route results — you do not write source yourself.
 
@@ -44,9 +44,13 @@ Memory (the accumulated DO/DON'T lessons) lives in **Obsidian**, not in this tab
 ### Phase 1 — Brainstorm → spec (scaled, gstack `spec`)
 **Trivial** single-file/mechanical/unambiguous work → state the design in one sentence and go straight to the architect. **Non-trivial** (multi-component, new feature, ambiguous scope, user-facing behavior change) → **invoke gstack `spec`** to turn the request into a precise, executable spec: it explores intent, surfaces edge cases, and produces the "what / why / acceptance" contract. Present it and **get explicit approval before Phase 2**. Use `AskUserQuestion` for clarifying questions (batch related ones). Hand the approved `spec` output to the architect as its starting point (the architect decomposes it into per-component build specs — no overlap).
 
-### Phase 2 — Architect (always)
-Dispatch the `pb-architect` agent (the plan-and-build spec-writer — **not** the `architect` orchestrator agent, which delegates teammates instead of writing specs). It takes the approved design as its starting point, **discovers the project's conventions**, decomposes into components, **splits the work so each builder has ONE single responsibility** (the bigger the job, the sloppier the output — split until each job can be done at its finest), **partitions files so no two parallel builders share a file**, **decides which skills each component needs** — drawing from its **skill palette** (the jeash-team strengths mapped to component archetypes): baked guidance skills it applies itself, action skills the builder must invoke (incl. gstack `browse`/`figma-to-vue`), and a per-component `QA emphasis` naming the Phase-5 lenses — all recorded in each spec's `## Skills` section, writes one spec per component to `docs/research/components/<name>.spec.md`, and returns a **dispatch plan** (`builder | spec path | owned files | tag | wave | depends-on | skills`) plus a **gate recommendation**. The architect is the **single decision point** for skill relevance — builders never discover skills, they only invoke the ones their spec names.
-- If the architect returns clarifying questions, ask the user via `AskUserQuestion` before continuing.
+### Phase 2 — Plan (specialist fan-out → synthesis)
+Planning is split: **domain specialists plan their own slice, then one synthesizer partitions the whole.** This mirrors the skill's core rule — one agent planning every domain at once is itself a big, sloppy job (the bigger the job, the sloppier the output). It is also DRY: the specialists ARE the jeash role agents, so improving a jeash agent improves this pipeline too.
+
+**Phase 2a — Specialist planning (parallel, read-only).** Fan out ONLY the jeash specialist fields the task touches — `jeash:frontend` (Vue components/views/stores), `jeash:ux` (design/a11y/layout/design-system), `jeash:dx` (refactor/quality/type-safety) — one `Agent` call each in a single message. Each gets the approved design + a **read-only PLANNING contract** (template below): it explores the project for ITS domain and returns a **spec-fragment** (proposed units, the files it would own, the project conventions it found, the skills its domain needs, risks). **Specialists plan; they do not edit** — nothing is partitioned yet. Spawn one field or all three; skip fields the task doesn't touch. `jeash:review` and `jeash:qa` are **Phase-5 QA lenses, not planners** — their blocker findings route back to the owning executor via the Phase-5 fix loop; `jeash:architect` is unused here — pb-architect is the synthesizer.
+
+**Phase 2b — Synthesis (`pb-architect`, always).** Dispatch `pb-architect` (the plan-and-build synthesizer — **not** the `architect` orchestrator agent, which delegates teammates instead of writing specs) with every fragment pasted inline. It **integrates** the fragments (does NOT re-plan each domain — it trusts each specialist's domain call and resolves only cross-domain conflicts): reconciles overlaps and duplicated units, **discovers/confirms the project's conventions**, **splits so each builder has ONE single responsibility** (split until each job can be done at its finest), **partitions files so no two parallel builders share a file** (it is the **single partition authority**), groups into waves, tags complexity, **assigns per-spec skills + a per-component `QA emphasis`** from its **skill palette** (baked guidance skills, builder-invoke action skills, and the Phase-5 lenses) — all in each spec's `## Skills` section, writes one spec per component to `docs/research/components/<name>.spec.md`, and returns a **dispatch plan** (`builder | spec path | owned files | tag | wave | depends-on | skills`) + a **gate recommendation**. It is the **single decision point** for skill relevance — builders never discover skills, they only invoke the ones their spec names. Trivial work with no fragments → it plans directly from the design, as before.
+- If any specialist or pb-architect returns clarifying questions, ask the user via `AskUserQuestion` before continuing.
 
 ### Phase 3 — Scaled gate (gstack `autoplan` on the plan)
 - **Single simple builder** (one `[low]`/`[med]` component, architect says `auto-proceed`) → proceed, no stop.
@@ -111,7 +115,8 @@ Components built · specs written (count should match builders) · files changed
 
 | Phase | Agent | Model | Role |
 |-------|-------|-------|------|
-| 2 | `pb-architect` | opus | consume design + discover conventions + dissect + partition + **assign skills per spec** + write specs |
+| 2a | `jeash:frontend` / `jeash:ux` / `jeash:dx` (only the fields the task needs) | per-agent | plan their own domain slice, read-only → **spec-fragment** |
+| 2b | `pb-architect` | opus | **integrate the fragments** + discover conventions + dissect + partition + **assign skills per spec** + write specs |
 | 4 | `executor-haiku` / `executor` / `executor-opus` | haiku / sonnet / opus | **invoke the spec's named skills**, build owned files, debug to root cause, verify with evidence |
 | 5 | `qa-reviewer` | sonnet | verify diff vs spec + **code quality** + project conventions (two verdicts) |
 | 6 | `retro` | sonnet | promote generalizable lessons to Obsidian (sync-brain gate); `lessons.md` fallback |
@@ -154,6 +159,32 @@ No worktrees. Safety comes from the architect's file partitioning: each builder 
 - **One builder = one job.** The architect splits until each builder has a single responsibility; big multi-purpose dispatches produce sloppy work. See the architect's split triggers.
 
 ## Dispatch templates
+
+### Specialist planner (Phase 2a, one per jeash field the task needs)
+```
+Repo root: <abs path>
+
+You are PLANNING your domain, not building. READ-ONLY: do not edit or create any source file.
+Your domain: <frontend: components/views/stores | ux: design/a11y/layout/design-system | dx: refactor/quality/type-safety>.
+
+--- APPROVED DESIGN ---
+<the approved design/spec from Phase 1>
+--- END DESIGN ---
+
+--- LESSONS (obey all) ---
+<relevant memory lessons — from Obsidian LEARNINGS/spoke, or lessons.md fallback>
+--- END LESSONS ---
+
+Explore the project (its CLAUDE.md / conventions / existing patterns) for YOUR domain only, then
+return a domain SPEC-FRAGMENT in markdown — no code:
+- Units you'd build/change in your domain, one-line responsibility each (no "and")
+- Files you propose to own (exact paths)
+- Project conventions that apply, with quoted paths (framework syntax, tokens, house patterns)
+- Skills your domain needs (baked guidance vs builder-invoke action)
+- Risks / edge cases / where your slice depends on another domain
+Do NOT partition files across domains or resolve cross-domain overlaps — pb-architect does that in 2b.
+If the design is ambiguous for your domain, return `## Clarifying questions` instead of a fragment.
+```
 
 ### Builder (per wave member)
 ```
@@ -229,6 +260,9 @@ issues. Do not edit.
 | Briefing an agent (architect/builder/QA/retro) without the recalled memory | Paste the recalled lessons inline into every dispatch (subagents get no injection) |
 | Repo not wired to a vault | Proceed best-effort (not a blocker); offer `/setup-obsidian-memory` once, fall back to `lessons.md` |
 | Editing specs from memory | Re-dispatch `pb-architect` for any structural change |
+| A Phase-2a specialist edits source | Planning is read-only — only builders edit, after pb-architect partitions |
+| pb-architect re-plans each domain from scratch | It integrates fragments — trust the domain call, resolve only cross-domain overlaps |
+| Fanning out planners for a one-line change | Trivial work skips 2a — pb-architect plans directly from the design |
 | One-shot build, no self-check | Builder loops vs acceptance criteria until satisfied (max 3 iterations) |
 | Endless QA ↔ fix ping-pong | Bound to 3 rounds, then halt + surface — never ship unsatisfied |
 | Reporting done with unmet criteria | Spec-satisfaction gate: every acceptance box must be true first |

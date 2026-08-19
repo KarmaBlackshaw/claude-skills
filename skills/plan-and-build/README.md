@@ -1,11 +1,13 @@
 # plan-and-build
 
 Architect-orchestrated, spec-driven, **self-learning** frontend build pipeline:
-**recall → brainstorm → architect → (scaled gate) → builders → QA → retro**.
+**recall → brainstorm → plan (specialists → synthesis) → (scaled gate) → builders → QA → retro**.
 
-Every non-trivial request first goes through a **scaled brainstorm** (design + approval), then
-an architect that dissects it, partitions the work into collision-free file sets, and writes one
-spec file per component. Builders (routed by complexity to haiku/sonnet/opus) build their owned
+Every non-trivial request first goes through a **scaled brainstorm** (design + approval), then a
+**planning phase** where jeash domain specialists (`frontend`/`ux`/`dx`) each draft a read-only
+spec-fragment for their slice (Phase 2a) and `pb-architect` **integrates** them — reconciling
+overlaps, partitioning the work into collision-free file sets, and writing one spec file per
+component (Phase 2b). Builders (routed by complexity to haiku/sonnet/opus) build their owned
 files in parallel, **debugging to root cause** and claiming done only **with verification
 evidence**. QA always verifies with **two verdicts (spec + code-quality)**. A retro agent
 promotes what it learned to **Obsidian long-term memory** so the next run is smarter.
@@ -18,8 +20,8 @@ promotes what it learned to **Obsidian long-term memory** so the next run is sma
 gstack and halts if it's missing. Commit/ship is deliberately excluded — committing stays the
 user's call.
 
-No git worktrees — parallel safety comes from the architect giving each builder a
-**disjoint** set of files.
+No git worktrees — parallel safety comes from `pb-architect` (the single partition authority)
+giving each builder a **disjoint** set of files.
 
 ## What's inside
 
@@ -34,7 +36,7 @@ plan-and-build/
 ├── lessons.md             # legacy local memory + write fallback when no vault is wired
 ├── spec-template.md       # the per-component spec the architect fills
 └── agents/
-    ├── pb-architect.md  # opus — consume design + partition + write specs (read-only on source)
+    ├── pb-architect.md  # opus — integrate 2a fragments + partition + write specs (read-only on source)
     ├── executor.md      # sonnet — build [med] owned files
     ├── executor-haiku.md# haiku  — build [low] owned files
     ├── executor-opus.md # opus   — build [high] owned files
@@ -59,8 +61,10 @@ user: "implement / build / fix / refactor <X>"
    │
    ├── Phase 0  Recall      read disciplines + Obsidian memory → inject into every prompt
    ├── Phase 1  Brainstorm  scaled: trivial → 1-line design; non-trivial → design + approval
-   ├── Phase 2  Architect   dissect, partition files, write docs/research/components/*.spec.md
-   │                         → dispatch plan (builder|spec|owned files|tag|wave|depends-on)
+   ├── Phase 2a Specialists fan out jeash frontend/ux/dx (read-only) → per-domain spec-fragments
+   ├── Phase 2b Synthesis   pb-architect integrates fragments, partitions files, writes
+   │                         docs/research/components/*.spec.md → dispatch plan
+   │                         (builder|spec|owned files|tag|wave|depends-on)
    ├── Phase 3  Scaled gate  single simple builder → auto-proceed
    │                         multi-component / any [high] → wait for "go"
    ├── Phase 4  Build        waves: parallel within (disjoint files), sequential across
