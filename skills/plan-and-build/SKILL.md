@@ -38,14 +38,14 @@ Memory (the accumulated DO/DON'T lessons) lives in **Obsidian**, not in this tab
    (there is no fallback); do not run a degraded pipeline.
 1. Read the two local ports (`using-skills.md`, `verifying.md`); apply them for the whole run. The gstack-owned disciplines are invoked at their phases per the table above.
 2. Read `using-skills.md` and, per it, invoke any process/framework skill that applies before acting.
-3. **Memory — Obsidian hub-and-spoke.** Resolve the vault from the repo's `CLAUDE.local.md`: `LEARNINGS=` (the cross-repo hub) and `ACTIVE_CONTEXT=` (this repo's spoke). The `obsidian-recall.sh` SessionStart hook usually injects both already; if not, read them (or run `/sync-brain pull`). These are the accumulated cross-project lessons — pass the relevant ones into every agent prompt below. Also read the skill-local `lessons.md` if it holds accumulated lessons (legacy local memory) so nothing is stranded.
-4. **If the repo is NOT wired to a vault** (`CLAUDE.local.md` absent, or no `LEARNINGS=`): ASK the user — provide the Obsidian vault path, or run `/setup-obsidian-memory` to wire this repo up. If they decline, use the skill-local `lessons.md` for this run (read and write).
+3. **Memory — Obsidian hub-and-spoke (ALWAYS read when wired).** If the repo is wired to a vault, recall it on EVERY run — never skip it, never assume it is already loaded. Resolve the vault from the repo's `CLAUDE.local.md`: `LEARNINGS=` (the cross-repo hub) and `ACTIVE_CONTEXT=` (this repo's spoke). The `obsidian-recall.sh` SessionStart hook usually injects both, but **confirm they are actually present in this context — if not, read the files yourself** (or run `/sync-brain pull`). Subagents get NO SessionStart injection, so the recalled lessons must be **pasted inline into every agent prompt** below (architect, builders, QA, retro). Also read the skill-local `lessons.md` (legacy) so nothing is stranded.
+4. **If the repo is NOT wired to a vault** (`CLAUDE.local.md` absent, or no `LEARNINGS=`): **memory is best-effort — proceed without it, this is not a blocker.** Offer `/setup-obsidian-memory` once as a suggestion (never nag, never halt), and fall back to the skill-local `lessons.md` (read + write) for this run.
 
 ### Phase 1 — Brainstorm → spec (scaled, gstack `spec`)
 **Trivial** single-file/mechanical/unambiguous work → state the design in one sentence and go straight to the architect. **Non-trivial** (multi-component, new feature, ambiguous scope, user-facing behavior change) → **invoke gstack `spec`** to turn the request into a precise, executable spec: it explores intent, surfaces edge cases, and produces the "what / why / acceptance" contract. Present it and **get explicit approval before Phase 2**. Use `AskUserQuestion` for clarifying questions (batch related ones). Hand the approved `spec` output to the architect as its starting point (the architect decomposes it into per-component build specs — no overlap).
 
 ### Phase 2 — Architect (always)
-Dispatch the `pb-architect` agent (the plan-and-build spec-writer — **not** the `architect` orchestrator agent, which delegates teammates instead of writing specs). It takes the approved design as its starting point, **discovers the project's conventions**, decomposes into components, **splits the work so each builder has ONE single responsibility** (the bigger the job, the sloppier the output — split until each job can be done at its finest), **partitions files so no two parallel builders share a file**, **decides which skills each component needs** (baked guidance skills it applies itself + action skills the builder must invoke — recorded in each spec's `## Skills` section), writes one spec per component to `docs/research/components/<name>.spec.md`, and returns a **dispatch plan** (`builder | spec path | owned files | tag | wave | depends-on | skills`) plus a **gate recommendation**. The architect is the **single decision point** for skill relevance — builders never discover skills, they only invoke the ones their spec names.
+Dispatch the `pb-architect` agent (the plan-and-build spec-writer — **not** the `architect` orchestrator agent, which delegates teammates instead of writing specs). It takes the approved design as its starting point, **discovers the project's conventions**, decomposes into components, **splits the work so each builder has ONE single responsibility** (the bigger the job, the sloppier the output — split until each job can be done at its finest), **partitions files so no two parallel builders share a file**, **decides which skills each component needs** — drawing from its **skill palette** (the jeash-team strengths mapped to component archetypes): baked guidance skills it applies itself, action skills the builder must invoke (incl. gstack `browse`/`figma-to-vue`), and a per-component `QA emphasis` naming the Phase-5 lenses — all recorded in each spec's `## Skills` section, writes one spec per component to `docs/research/components/<name>.spec.md`, and returns a **dispatch plan** (`builder | spec path | owned files | tag | wave | depends-on | skills`) plus a **gate recommendation**. The architect is the **single decision point** for skill relevance — builders never discover skills, they only invoke the ones their spec names.
 - If the architect returns clarifying questions, ask the user via `AskUserQuestion` before continuing.
 
 ### Phase 3 — Scaled gate (gstack `autoplan` on the plan)
@@ -83,7 +83,7 @@ Blocked builder → escalate one tier (haiku → sonnet → opus). Opus blocked 
 
 QA returns **two verdicts per component: spec-compliance AND code-quality** — plus the quoted typecheck/lint/build output (`verifying.md` — no PASS without evidence).
 
-**Runtime + multi-lens (gstack, orchestrator-invoked after the static pass):** a green build is not a working feature.
+**Runtime + multi-lens (gstack, orchestrator-invoked after the static pass):** a green build is not a working feature. **Run each component's flagged lenses** — the `QA emphasis` line pb-architect put in its spec names exactly which of these apply (UI component → `qa`/`design-review`; risky logic → `review`/`health`) — plus one whole-diff `review`.
 - **gstack `qa`** — drive the running app through the changed flow (click-test, console errors, broken states) whenever the work is user-facing. This is the runtime gate.
 - **gstack `review`** — a pre-landing multi-lens read of the whole diff (architecture / reuse / conventions), complementing per-component spec checks.
 - **gstack `design-review`** — designer's-eye pass (spacing, hierarchy, AI-slop, slow interactions) when the change touches UI.
@@ -124,11 +124,11 @@ The skill's long-term memory is the **Obsidian vault**, shared across repos via 
 - **Hub** (`LEARNINGS`) — cross-repo, cross-project lessons, curated as atomic notes (one `[[wikilink]]` index line each). This is where plan-and-project **generalizable** lessons live.
 - **Spoke** (`ACTIVE_CONTEXT`) — this repo's session log; run summaries go here.
 
-Paths are resolved from the repo's gitignored `CLAUDE.local.md` (`LEARNINGS=`, `ACTIVE_CONTEXT=`) — **never hardcoded**. Read at Phase 0 (usually auto-injected by `obsidian-recall.sh`), written at Phase 6 via **sync-brain's Promotion gate** (reusable + behavior-changing + not-already-covered; most takeaways never reach the hub).
+Paths are resolved from the repo's gitignored `CLAUDE.local.md` (`LEARNINGS=`, `ACTIVE_CONTEXT=`) — **never hardcoded**. **When wired, ALWAYS read at Phase 0** (confirm the `obsidian-recall.sh` hook actually injected it — if not, read the files yourself; never skip a wired vault), written at Phase 6 via **sync-brain's Promotion gate** (reusable + behavior-changing + not-already-covered; most takeaways never reach the hub).
 
-**REQUIRED COMPANIONS:** the `sync-brain` skill (runtime read/write) and `setup-obsidian-memory` skill (wires a repo to the vault). If a repo isn't wired, Phase 0 asks for the vault path or offers `/setup-obsidian-memory`.
+**REQUIRED COMPANIONS:** the `sync-brain` skill (runtime read/write) and `setup-obsidian-memory` skill (wires a repo to the vault). Memory is **best-effort** — if a repo isn't wired, Phase 0 proceeds without it (offers `/setup-obsidian-memory` once; never blocks).
 
-**`lessons.md` — legacy local memory + write fallback.** It is *read* at Phase 0 alongside the Obsidian hub (so its accumulated lessons are never stranded), but it is *written* at Phase 6 only when the repo isn't wired to a vault. It holds only generalizable, cross-project lessons; project-specific conventions are discovered live. Its durable subset can be migrated into the Obsidian hub as atomic notes via `/sync-brain` (a one-time curation, gated by the Promotion rule).
+**`lessons.md` — legacy local memory + write fallback.** It is *read* at Phase 0 alongside the Obsidian hub (so its accumulated lessons are never stranded), and it is the read/write fallback at Phase 6 **only when the repo isn't wired to a vault**. It holds only generalizable, cross-project lessons; project-specific conventions are discovered live. Its durable subset can be migrated into the hub as atomic notes via `/sync-brain` (a one-time curation, gated by the Promotion rule).
 
 ## Skill discovery — `using-skills.md`
 
@@ -146,7 +146,7 @@ No worktrees. Safety comes from the architect's file partitioning: each builder 
 - **DESIGN BEFORE BUILD** for non-trivial work — produce a spec with gstack `spec` and get approval before the architect. Trivial single-file work may skip with a one-line design.
 - **EVIDENCE BEFORE CLAIMS.** No "done / passing / fixed" from any layer without fresh, quoted verification output (`verifying.md`).
 - **ROOT CAUSE BEFORE FIX.** Any verify failure / QA blocker is debugged to its root cause first — no symptom patches (gstack `investigate`).
-- **Memory is Obsidian** when the repo is wired; ask for the vault or offer `/setup-obsidian-memory` when it isn't. Never hardcode vault paths.
+- **ALWAYS recall Obsidian memory when the repo is wired** — every run, confirmed present (not assumed), and injected into every agent prompt. Not wired → memory is best-effort; **proceed without it (never a blocker)**, offer `/setup-obsidian-memory` once. Never hardcode vault paths.
 - **Specs are mandatory.** No builder without its spec file in `docs/research/components/`.
 - **Self-contained subagent prompts.** Subagents have zero context — brief every dispatch from scratch and paste the spec + lessons + disciplines inline. No "as discussed above".
 - **QA and Retro always run** — even for a single-builder task.
@@ -169,7 +169,8 @@ Owned files: <paths>
 --- SKILLS (invoke BEFORE writing code) ---
 Invoke each skill in the spec's "Builder MUST invoke" list via the Skill tool, follow it,
 then build. The "Baked" skills are already distilled into the spec — do NOT re-invoke them.
-Invoke nothing the spec does not name. If a skill suggests committing, ignore + surface.
+Ignore the spec's "QA emphasis" list — those are the orchestrator's Phase-5 lenses, not yours.
+Invoke nothing else the spec does not name. If a skill suggests committing, ignore + surface.
 --- END SKILLS ---
 
 --- DISCIPLINES ---
@@ -223,8 +224,10 @@ issues. Do not edit.
 | Claiming done/passing without running verify | Evidence before claims (`verifying.md`) — quote fresh output |
 | Blind-implementing or performatively agreeing to a QA finding | Evaluate technically; push back with reasoning if the finding is wrong |
 | Auto-committing | Ask the user first |
-| Writing lessons to `lessons.md` while a vault is wired | Promote to Obsidian via sync-brain; `lessons.md` is fallback only |
-| Repo not wired to a vault and no memory | Ask for the vault path or offer `/setup-obsidian-memory` |
+| Writing lessons to `lessons.md` while a vault is wired | Promote to Obsidian via sync-brain; `lessons.md` is the fallback only |
+| Skipping a wired vault / assuming the SessionStart hook loaded it | Confirm memory is present; if not, read the files yourself — never skip a wired vault |
+| Briefing an agent (architect/builder/QA/retro) without the recalled memory | Paste the recalled lessons inline into every dispatch (subagents get no injection) |
+| Repo not wired to a vault | Proceed best-effort (not a blocker); offer `/setup-obsidian-memory` once, fall back to `lessons.md` |
 | Editing specs from memory | Re-dispatch `pb-architect` for any structural change |
 | One-shot build, no self-check | Builder loops vs acceptance criteria until satisfied (max 3 iterations) |
 | Endless QA ↔ fix ping-pong | Bound to 3 rounds, then halt + surface — never ship unsatisfied |

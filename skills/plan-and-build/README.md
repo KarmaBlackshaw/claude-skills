@@ -31,7 +31,7 @@ plan-and-build/
 ├── verifying.md           # local port: no completion claim without fresh evidence (no gstack owner)
 │                          # design/debug/QA disciplines now come from gstack: spec, autoplan,
 │                          # investigate, qa/browse/review/design-review/health (see SKILL.md table)
-├── lessons.md             # legacy local memory + write fallback (memory is Obsidian now)
+├── lessons.md             # legacy local memory + write fallback when no vault is wired
 ├── spec-template.md       # the per-component spec the architect fills
 └── agents/
     ├── pb-architect.md  # opus — consume design + partition + write specs (read-only on source)
@@ -85,11 +85,14 @@ The skill's long-term memory is the **Obsidian hub-and-spoke vault**, shared acr
 Generalizable, cross-project lessons are promoted to the **hub** (`LEARNINGS`) as curated
 atomic notes via the `sync-brain` Promotion gate at Phase 6; run summaries go to this repo's
 **spoke** (`ACTIVE_CONTEXT`). Paths are resolved from the gitignored `CLAUDE.local.md` — never
-hardcoded — and injected at Phase 0 (usually by the `obsidian-recall.sh` SessionStart hook).
+hardcoded — and, **when the repo is wired, recalled at Phase 0 on EVERY run** (usually injected by
+the `obsidian-recall.sh` SessionStart hook; Phase 0 confirms it's present and reads the files itself
+if not, and pastes the lessons into every agent prompt since subagents get no injection).
 
-If a repo isn't wired to a vault, Phase 0 asks for the vault path or offers to run
-`/setup-obsidian-memory`. The skill-local `lessons.md` is **legacy local memory** (still read at
-Phase 0 so nothing is stranded) and the **write fallback** when no vault is configured.
+**Memory is best-effort — never a blocker.** If a repo isn't wired to a vault, Phase 0 simply
+proceeds without it (offering `/setup-obsidian-memory` once). The skill-local `lessons.md` is
+**legacy local memory**, still *read* at Phase 0 so nothing is stranded, and the read/write fallback
+when no vault is configured.
 
 **Required companions:** `sync-brain` (runtime read/write) and `setup-obsidian-memory` (wiring).
 

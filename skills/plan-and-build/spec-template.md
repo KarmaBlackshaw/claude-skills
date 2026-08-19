@@ -19,6 +19,7 @@
 > Architect fills both lists (Phase 2, step 7). Builder reads this FIRST.
 - **Baked — already applied by the architect, do NOT re-invoke:** <skill names, or "none"> — their concrete rules are folded into the Conventions checklist below.
 - **Builder MUST invoke before coding (action skills):** <skill names, or "none"> — invoke each via the `Skill` tool, follow it, THEN build. Do not invoke any skill not listed here.
+- **QA emphasis (Phase 5 — the ORCHESTRATOR runs these, not the builder):** <gstack lens names, or "none"> — the runtime/multi-lens skills this component needs (e.g. `qa`/`browse` for a flow, `design-review` for UI, `review`/`health` for risky logic). The builder ignores this line.
 
 ## Public API
 - **Inputs / props:** <names + types>
