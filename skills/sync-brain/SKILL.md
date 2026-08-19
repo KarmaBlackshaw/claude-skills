@@ -38,7 +38,9 @@ Load memory into context so you start informed.
 The `obsidian-recall.sh` SessionStart hook already auto-pulls; use this for a manual mid-session refresh.
 
 ### `push`
-Persist this session's outcome. Default target is the **spoke** (`ACTIVE_CONTEXT`). The **hub** (`LEARNINGS`) is a small curated set — not a dump. Most sessions add nothing to it. Nothing important is lost on rotation because the two things worth keeping have durable homes: **learnings** graduate to the hub (gate below), and **follow-ups** land in the **THREADS ledger**.
+Persist this session's outcome. Default target is the **spoke** (`ACTIVE_CONTEXT`). The **hub** (`LEARNINGS`) is a small curated set — not a dump. Nothing important is lost on rotation because the two things worth keeping have durable homes: **learnings** graduate to the hub (gate below), and **follow-ups** land in the **THREADS ledger**.
+
+**Two paths persist sessions — they promote differently.** The **unattended auto-capture path** (`obsidian-capture.sh` SessionEnd → `obsidian-drain.sh` headless synthesizer) judges every session with no human in the loop, so it errs toward silence: headline to the spoke, hub promotion **rare**. A **manual `/sync-brain push`** is the opposite signal — you ran it because this session mattered, so it errs toward capturing: when a takeaway clears the three criteria below, promote it to the hub **immediately**, don't defer it as "too rare." Same gate, two postures. (No collision between the paths: the drain dedups against what's already recorded, so a session you push manually won't get re-promoted unattended.)
 1. **Upsert** this session's entry in the Sessions list (newest first) using the **Session-End Template** below (a single ≤12-word headline line). **Do this with one shell command, not the Edit tool** — an Edit renders a diff block in the chat, which the user does not want to see. The command is a single upsert keyed on the `<!-- session: <id> -->` marker: if that marker already exists (you saved earlier this session, now correcting the headline), it replaces the `### ` headline line above the marker in place; otherwise it prepends a new entry under the `## Sessions (newest first)` line:
 
    ```bash
@@ -49,7 +51,7 @@ Persist this session's outcome. Default target is the **spoke** (`ACTIVE_CONTEXT
 2. **No rotation by default.** Entries are one line each, so the spoke grows slowly; leave old entries in place. <!-- ponytail: the recall hook injects the whole spoke every session, so this grows context ~1 line/session — a far ceiling. If it ever bloats, add a trim to the awk command (keep newest ~20 `### ` blocks). -->
 3. **Optional — only if it matters:** if a follow-up genuinely needs to survive, append one `open` row to the `THREADS` ledger the same one-command way. Skip otherwise.
 
-**Promotion gate — most takeaways NEVER reach the hub.** Promote to `LEARNINGS` only if ALL hold:
+**Promotion gate — the three criteria.** Promote a takeaway to `LEARNINGS` when ALL hold. On a **manual push**, meeting all three IS the trigger — promote now. On the **auto-drain**, apply them conservatively (err toward not promoting):
 - **Reusable** beyond this one session — you'd genuinely apply it again.
 - **Behavior-changing** — it would alter a future decision, not just record what happened.
 - **Not already covered** — grep the hub first; no existing entry says the same thing.
@@ -66,7 +68,7 @@ A takeaway failing any gate stays in `ACTIVE_CONTEXT`. Stack-specific lessons (S
 
 **Soft cap.** If a spoke's `##` area passes ~15–20 lessons or reads noisy, merge related `###` subsections into one sharper lesson (merge the bodies, collapse their index lines).
 
-4. Only if a lesson passed the Promotion gate above: write it to its domain spoke + refresh the hub index (an Edit is fine here — promotion is rare and worth seeing). Otherwise there is nothing else to write. Either way, your ONLY visible output is the single word `Saved.` (or `Nothing to save.` if the session was trivial/read-only) — no summary, no counts, no narration of these steps.
+4. Only if a lesson passed the Promotion gate above: write it to its domain spoke + refresh the hub index (an Edit is fine here — a promotion is worth seeing). Otherwise there is nothing else to write. Either way, your ONLY visible output is the single word `Saved.` (or `Nothing to save.` if the session was trivial/read-only) — no summary, no counts, no narration of these steps.
 
 ## Session-End Template
 
@@ -107,7 +109,7 @@ Source: <repo> · YYYY-MM-DD
 ## Rules
 - Summarize only what actually happened this session — never invent entries.
 - Use the real current date.
-- Promotion to the hub is the exception, not the default — most sessions add nothing to `Learnings.md`.
+- On the **auto-drain** path, promotion to the hub is the exception — most unattended sessions add nothing to `Learnings.md`. On a **manual `/sync-brain push`**, promote any takeaway that clears the three criteria immediately — you running push is the signal it's worth keeping.
 - Keep the spoke (`<repo>.md`, resolved from `ACTIVE_CONTEXT`) lean; keep `Learnings.md` small and curated — refine existing entries over appending new ones.
 - Pass file content through unchanged except for the edits above — in particular, preserve the spoke's `tags: [project/<repo>]` frontmatter (it's the note's graph hub label; see setup-obsidian-memory → **Graph project tag**).
 - Domain spokes (`Learnings/{Frontend,Backend-Data,Mobile,Workflow}.md`) stay tagged `[learning]` only — never add a `project/<repo>` tag; they're cross-repo and hub to `[[Learnings]]`.

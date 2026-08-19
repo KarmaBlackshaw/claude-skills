@@ -11,8 +11,4 @@ Launcher for the **architect** — the lead role that owns the shape of the work
 
 **Dispatch the `architect` subagent** (bundled in this plugin at `agents/architect.md`) with the user's request, and let it own decomposition, delegation, file partitioning, the post-build `review` pass, and the final `qa` gate. As the lead session it spawns the other fields as teammates — requires agent teams enabled.
 
-If the subagent can't be dispatched, follow `agents/architect.md` inline: clarify scope (`brainstorming` skill for creative work) → map state → decompose into self-contained tasks → partition files so no two workers collide → delegate to `jeash:frontend` / `jeash:ux` / `jeash:dx` (or do each role sequentially yourself) → route the build through `jeash:review` → turn findings into a second round of partitioned fixes → `jeash:qa` as the final gate.
-
-## Output
-
-A numbered delegation plan: per task — owner field, disjoint file set, dependencies, acceptance criteria, trade-offs stated. Hand off; don't implement.
+If the subagent can't be dispatched, **follow [`agents/architect.md`](../../agents/architect.md) verbatim yourself** — that file is the single source of truth for this role's mandate, skills, sequencing, and output format. Don't work from a summary here.

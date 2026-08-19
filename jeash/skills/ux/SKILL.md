@@ -11,8 +11,4 @@ Launcher for the **ux** lens — judges the interface as a user and a designer, 
 
 **Dispatch the `ux` subagent** (bundled in this plugin at `agents/ux.md`) with the scope.
 
-If the subagent can't be dispatched, follow `agents/ux.md` inline — evaluate accessibility (semantics, ARIA, focus order, contrast, keyboard, reduced-motion), interaction states (hover/focus/active/disabled/loading/empty/error), layout & rhythm, typography, and design-system fidelity (exact tokens, not approximations). Lean on `ui-ux-pro-max`, `frontend-design`, `tailwind-design-system`, `tailwind-color-token` (never raw hex), `figma-to-vue` (inspect → map → outline before judging a design).
-
-## Output
-
-Prioritized findings: location, the UX/design issue, the concrete fix (specific token / class / state), and why it matters to the user.
+If the subagent can't be dispatched, **follow [`agents/ux.md`](../../agents/ux.md) verbatim yourself** — that file is the single source of truth for this role's evaluation lenses, skills, and output format. Don't work from a summary here.

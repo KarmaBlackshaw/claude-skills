@@ -11,8 +11,4 @@ Launcher for the **frontend** builder — ships working Vue 3 + TS + Pinia + Tai
 
 **Dispatch the `frontend` subagent** (bundled in this plugin at `agents/frontend.md`) with the task and the files it owns.
 
-If the subagent can't be dispatched, follow `agents/frontend.md` inline. Stack defaults: Vue 3 Composition API + `<script setup>`, TypeScript always, Pinia setup stores, Tailwind utilities (check for a class prefix like `tw-` first; apply it to every utility incl. variants). Invoke the matching skill before writing code — `vue-best-practices`, `vue-pinia-best-practices`, `tailwind-color-token` (before any raw hex), `figma-to-vue` (any Figma URL). Reuse existing components/composables before creating new ones; match neighboring idiom; type everything.
-
-## Output
-
-Working, typecheck-clean code within the assigned files. State what changed; hand off to `jeash:qa` for verification.
+If the subagent can't be dispatched, **follow [`agents/frontend.md`](../../agents/frontend.md) verbatim yourself** — that file is the single source of truth for this role's stack defaults, skills, and output format. Don't work from a summary here.

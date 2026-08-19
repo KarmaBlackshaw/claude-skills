@@ -11,8 +11,4 @@ Launcher for **qa** — the final quality gate. Finds what's wrong and proves it
 
 **Dispatch the `qa` subagent** (bundled in this plugin at `agents/qa.md`) with the scope and spec.
 
-If the subagent can't be dispatched, follow `agents/qa.md` inline: check correctness vs spec (incl. edge cases) → conventions (CLAUDE.md, lint, surrounding patterns) → run the project's actual commands — typecheck (`vue-tsc`/`tsc`), lint, build, tests — and **quote the real output**. Never say "passing" without having run the command and seen the result; quote exact errors. Use the `verification-before-completion` discipline.
-
-## Output
-
-Findings ordered by severity: `file:line`, problem, suggested fix, and the command-output evidence backing it. End with a clear verdict and which field should address each item.
+If the subagent can't be dispatched, **follow [`agents/qa.md`](../../agents/qa.md) verbatim yourself** — that file is the single source of truth for this role's checks (incl. the runtime gstack `qa` pass), skills, and output format. Don't work from a summary here.
