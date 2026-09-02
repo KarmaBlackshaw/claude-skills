@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# Detect / kill processes holding ports.
+# A port is "stale" if its listener has no active connections (no browser
+# attached) OR is orphaned (parent terminal died, PPID 1).
+# Usage:
+#   killports                  # list listeners on common dev ports, tagged ACTIVE/STALE
+#   killports -k               # kill ALL listeners on those ports
+#   killports --stale          # list only stale ones
+#   killports -k --stale       # kill only stale ones  (the safe cleanup)
+#   killports 5173 6006        # target specific ports (any flag combo works)
+set -euo pipefail
+
+KILL=false
+STALE_ONLY=false
+PORTS=()
+for arg in "$@"; do
+  case "$arg" in
+    -k|--kill)  KILL=true ;;
+    -s|--stale) STALE_ONLY=true ;;
+    -h|--help)  grep '^#' "$0" | cut -c3-; exit 0 ;;
+    *) PORTS+=("$arg") ;;
+  esac
+done
+
+[ ${#PORTS[@]} -eq 0 ] && PORTS=(3000 4173 5173 5174 6006 8080)
+
+found=false
+for port in "${PORTS[@]}"; do
+  for pid in $(lsof -ti "tcp:${port}" -sTCP:LISTEN 2>/dev/null || true); do
+    info=$(ps -p "$pid" -o comm= 2>/dev/null || echo "?")
+    ppid=$(ps -o ppid= -p "$pid" 2>/dev/null | tr -d ' ')
+    est=$(lsof -nP -p "$pid" -iTCP:"$port" -sTCP:ESTABLISHED 2>/dev/null | grep -c ESTABLISHED || true)
+
+    stale=false
+    reason="active ($est conn)"
+    if [ "${ppid:-0}" = "1" ]; then
+      stale=true; reason="orphaned (PPID 1)"
+    elif [ "$est" -eq 0 ]; then
+      stale=true; reason="idle (0 conn)"
+    fi
+    $STALE_ONLY && ! $stale && continue
+
+    found=true
+    tag=$($stale && echo STALE || echo ACTIVE)
+    if $KILL; then
+      kill "$pid" 2>/dev/null && echo "killed [$tag] :$port  pid $pid  ($info) - $reason"
+    else
+      echo "[$tag] :$port  pid $pid  ($info) - $reason"
+    fi
+  done
+done
+
+if ! $found; then
+  $STALE_ONLY && echo "no stale listeners on: ${PORTS[*]}" || echo "no listeners on: ${PORTS[*]}"
+fi
+if ! $KILL && $found; then echo "-> add -k to kill"; fi

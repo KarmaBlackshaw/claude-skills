@@ -134,10 +134,36 @@ for skill in "${SKILLS_TO_INSTALL[@]}"; do
   fi
 done
 
-echo ""
-if [ "$INSTALLED_AGENTS" -gt 0 ]; then
-  success "Done. Installed $INSTALLED_SKILLS skill(s) + $INSTALLED_AGENTS agent(s)."
-else
-  success "Done. Installed $INSTALLED_SKILLS skill(s)."
+# Install CLI tools from bin/ onto PATH
+INSTALLED_BINS=0
+BIN_SRC="$REPO/bin"
+BIN_DIR="$HOME/.local/bin"
+if [ -d "$BIN_SRC" ]; then
+  mkdir -p "$BIN_DIR"
+  while IFS= read -r -d '' tool; do
+    name="$(basename "$tool")"
+    cp "$tool" "$BIN_DIR/$name"
+    chmod +x "$BIN_DIR/$name"
+    success "cli: $name → $BIN_DIR/$name"
+    INSTALLED_BINS=$((INSTALLED_BINS + 1))
+  done < <(find "$BIN_SRC" -maxdepth 1 -type f -print0)
+
+  # Ensure ~/.local/bin is on PATH
+  if [ "$INSTALLED_BINS" -gt 0 ] && [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
+    case "${SHELL:-}" in
+      *bash) RC="$HOME/.bashrc" ;;
+      *)     RC="$HOME/.zshrc" ;;
+    esac
+    if ! grep -q '.local/bin' "$RC" 2>/dev/null; then
+      echo 'export PATH="$HOME/.local/bin:$PATH"' >> "$RC"
+      warn "Added ~/.local/bin to PATH in $RC — run 'source $RC' or open a new terminal."
+    fi
+  fi
 fi
+
+echo ""
+SUMMARY="Done. Installed $INSTALLED_SKILLS skill(s)"
+[ "$INSTALLED_AGENTS" -gt 0 ] && SUMMARY="$SUMMARY + $INSTALLED_AGENTS agent(s)"
+[ "$INSTALLED_BINS" -gt 0 ] && SUMMARY="$SUMMARY + $INSTALLED_BINS cli tool(s)"
+success "$SUMMARY."
 warn "Restart Claude Code fully (quit, don't just close the window) to load."
