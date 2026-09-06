@@ -4,7 +4,7 @@
   "private": true,
   "description": "Monorepo of Claude Code skills + Obsidian hub-and-spoke memory (jeash plugin).",
   "scripts": {
-    "sync:plan-and-build": "bash skills/plan-and-build/sync.sh",
-    "sync:plan-and-build:check": "bash skills/plan-and-build/sync.sh --check"
+    "sync:plan-and-build": "bash sync.sh",
+    "sync:plan-and-build:check": "bash sync.sh --check"
   }
 }

@@ -7,7 +7,7 @@ A personal collection of [Claude Code](https://docs.claude.com/en/docs/claude-co
 | Skill | Description |
 |-------|-------------|
 | [`figma-to-vue`](./figma-to-vue) | Convert Figma designs into Vue 3 + Tailwind components via a 4-step workflow (inspect → map → outline → build) that prevents the usual failure modes — guessing hex codes, rounding spacing, misreading hierarchy. |
-| [`plan-and-build`](./plan-and-build) | Two-phase feature workflow — opus planner writes a markdown plan, user approves, then sonnet/haiku/opus executors implement step-by-step, routed by complexity tag. No auto-commit. No test-file writes. Bundles 4 subagents (planner + 3 executors). |
+| [`plan-and-build`](./plan-and-build) | Architect-orchestrated, spec-driven, self-learning build pipeline — 7 phases (recall → brainstorm → plan → gate → build → QA → retro), right-sized by fast/standard/heavy lanes over a lane-independent floor (spec, quoted build evidence, ≥1 QA pass, root-cause-before-fix, runtime gate on user-facing work). Builders routed by complexity tag to haiku/sonnet/opus. No auto-commit. No test-file writes. Bundles 6 subagents. **Requires gstack.** |
 | [`tailwind-color-token`](./tailwind-color-token) | Converts arbitrary hex color values to named Tailwind design tokens. Checks `tailwind.config.js` before asking, batches multiple new hexes, inserts tokens into `theme.extend.colors`, and rewrites the raw hex in code. |
 | [`sprint-release-cherry-pick`](./sprint-release-cherry-pick) | Cut a QA release from a ClickUp sprint. Reads the active sprint's Ready-for-Release tickets, resolves each ticket's linked GitHub branch/commits (ClickUp first, git-verified), then per repo cuts `qa-claude-<date>` off `qa`, cherry-picks the commits, and opens a PR into `qa`. Dry-run + confirm gate before any write; config-driven (org/repos/sprint/status in a gitignored `config.yaml`). |
 | [`resolving-merge-conflicts`](./resolving-merge-conflicts) | Resolve an in-progress git merge/rebase/cherry-pick conflict by intent — read commit messages/PRs/tickets, preserve both sides where possible, run the project's checks, and finish the operation (never `--abort`). Companion to `sprint-release-cherry-pick`. |
@@ -22,10 +22,12 @@ Some skills ship subagent definitions under their `agents/` subdirectory. The in
 
 | Agent | Bundled by | Model | Role |
 |-------|-----------|-------|------|
-| `planner` | plan-and-build | opus | Writes implementation plan, no code |
 | `executor` | plan-and-build | sonnet | Default executor for `[med]` steps |
 | `executor-haiku` | plan-and-build | haiku | Mechanical `[low]` steps — cheap |
 | `executor-opus` | plan-and-build | opus | Hard `[high]` steps — algorithms, security, perf |
+| `pb-architect` | plan-and-build | opus | Integrates Phase-2a fragments, discovers conventions, partitions files, writes one spec per component |
+| `qa-reviewer` | plan-and-build | sonnet | Two verdicts (spec-compliance + code-quality) + quoted typecheck/lint/build |
+| `retro` | plan-and-build | sonnet | Promotes generalizable lessons to Obsidian; `lessons.md` fallback |
 
 Agents differ from `references/` (used by `figma-to-vue`):
 - `references/` are lazy-loaded markdown docs, read in-place by the skill from inside its folder
@@ -96,7 +98,7 @@ If the skill bundled agents, also remove them:
 
 ```bash
 # example for plan-and-build's bundled agents
-rm -f ~/.claude/agents/{planner,executor,executor-haiku,executor-opus}.md{,.bak}
+rm -f ~/.claude/agents/{pb-architect,executor,executor-haiku,executor-opus,qa-reviewer,retro}.md{,.bak}
 ```
 
 Restart Claude Code.

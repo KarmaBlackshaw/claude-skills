@@ -44,15 +44,18 @@ component to its archetype below; assign only what it actually needs.
 | Component archetype | Builder-side — Baked / MUST-invoke | QA emphasis (Phase 5) |
 |---|---|---|
 | **Vue component / view** (frontend) | Baked: `vue-best-practices`, `web-component-design`, `frontend-design` · Invoke: `tailwind-color-token` (before any raw hex), `figma-to-vue` (if a Figma URL), gstack `browse` (render-check before ✅) | gstack `qa` (drive the flow), `design-review` (visual) |
-| **Pinia store / composable / state** (frontend) | Baked: `vue-pinia-best-practices`, `vue-best-practices` | — |
+| **Pinia store / composable / state** (frontend) | Baked: `vue-pinia-best-practices`, `vue-best-practices` | gstack `qa` **if the store drives a user-facing flow** (floor), else — |
 | **Design- / a11y-heavy UI** (ux) | Baked: `ui-ux-pro-max`, `tailwind-design-system` · Invoke: `tailwind-color-token` | gstack `design-review`, `browse` |
-| **Refactor / cleanup / type-tightening** (dx) | Baked: `typescript-advanced-types` · Invoke: gstack `investigate` (only if the refactor is likely to surface a latent bug) | gstack `health`, `review` |
-| **Complex / risky / perf-sensitive logic** (review + qa) | Invoke: gstack `investigate` (root-cause any verify failure) | gstack `review` (multi-lens), `qa` |
+| **Refactor / cleanup / type-tightening** (dx) | Baked: `typescript-advanced-types` · Invoke: gstack `investigate` (only if the refactor is likely to surface a latent bug) | gstack `health` · `review` (heavy lane only) |
+| **Complex / risky / perf-sensitive logic** (review + qa) | Invoke: gstack `investigate` (root-cause any verify failure) | gstack `qa` · `review` (heavy lane only) |
 
 Palette rules:
 - **Builder-side** entries fill the spec's Baked / MUST-invoke lists; **QA-emphasis** entries fill the spec's `QA emphasis:` line — those run in Phase 5, never in the builder.
 - gstack `investigate` is already the pipeline's root-cause discipline on any verify failure — only *name* it when the component is bug-prone enough to call out.
 - Never assign a UI skill to a logic-only component, or vice-versa. Match the archetype, don't blanket-list.
+- **FLOOR — `QA emphasis` is now binding, and an empty line means Phase 5 runs NOTHING.** Phase 5 runs ONLY the lenses you flag. So if the component's change is user-facing at runtime — including a store, composable, or logic change that drives a visible flow — its `QA emphasis` MUST name gstack `qa`. The runtime gate is lane-independent floor; you cannot omit it as "not needed". The "no blanket lists" rule above governs *builder* skills and the optional lenses — it never licenses dropping the runtime gate.
+- gstack `review` is a **whole-diff, heavy-lane-only** lens. Flag it only when you recommend the `heavy` lane; on `fast`/`standard` it does not run, so a spec that flags it there creates a contradiction.
+- Every spec gets a `QA emphasis:` line. If genuinely no lens applies, write `QA emphasis: none — not user-facing, no risky logic` and say why. Never leave the field absent or blank.
 
 ## Decomposition discipline (the most important part)
 
@@ -84,7 +87,7 @@ signal to SPLIT — never to write a longer prompt. Each dispatched job must be 
 
 - **Approach:** 1–3 trade-offs + your recommendation.
 - **Dispatch plan table:** `builder | spec path | owned files | complexity tag | wave | depends-on | skills (baked / builder-invokes / qa-emphasis)`.
-- **Gate recommendation:** `auto-proceed` (single simple builder, no `[high]`) or `needs approval` (multi-component or any `[high]`).
+- **Lane recommendation** (drives the Phase-3 gate and the Phase-5 depth — you are the only agent that sees the whole decomposition, so this call is yours): `fast` (one `[low]`/`[med]` component, ≤ a couple of files, unambiguous — auto-proceed) · `standard` (multi-file, no `[high]`) · `heavy` (any `[high]`, or cross-cutting / ambiguous multi-component). **Unsure between two → name the heavier.**
 - **Risks** + **Out of scope**.
 
 ## Rules

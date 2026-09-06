@@ -65,14 +65,15 @@ user: "implement / build / fix / refactor <X>"
    ├── Phase 2b Synthesis   pb-architect integrates fragments, partitions files, writes
    │                         docs/research/components/*.spec.md → dispatch plan
    │                         (builder|spec|owned files|tag|wave|depends-on)
-   ├── Phase 3  Scaled gate  single simple builder → auto-proceed
-   │                         multi-component / any [high] → wait for "go"
+   ├── Phase 3  Lane gate    fast → auto-proceed · standard → show plan, wait for "go"
+   │                         heavy → gstack autoplan first, then wait for "go"
    ├── Phase 4  Build        waves: parallel within (disjoint files), sequential across
    │                         route [low|med|high] → haiku/sonnet/opus; spec + disciplines inline
    │                         root cause before fix · no ✅ without quoted verify output
    ├── Phase 5  QA           tiered: 1 qa-reviewer (simple) or 1-per-component (complex)
-   │                         two verdicts (spec + code-quality); blockers routed back to builder
-   └── Phase 6  Retro        distill generalizable lessons → promote to Obsidian hub
+   │                         two verdicts (spec + code-quality); blockers routed back to builder;
+   │                         only the lenses the spec's QA emphasis flags, run in parallel
+   └── Phase 6  Retro        distill generalizable lessons → promote to Obsidian hub — backgrounded
 ```
 
 ## Project-agnostic
@@ -109,11 +110,12 @@ user's call.
 
 ## Why this exists
 
-- **Architect on opus** — a bad decomposition poisons everything downstream.
+- **Architect on opus** — a bad decomposition poisons everything downstream. It is one agent per run, every builder is briefed only from its spec, and on the fast/standard lanes no gate reviews the decomposition before code is written — the cheapest place in the pipeline to buy judgment.
+- **Fast/standard/heavy lanes over a lane-independent floor** — right-size the ceremony to the task, but never below the floor: spec/acceptance contract, build verification with quoted evidence, ≥1 qa-reviewer pass, root-cause-before-fix, a runtime gate on user-facing work, and evidence-before-claims with no auto-commit.
 - **Collision-free parallelism without worktrees** — file partitioning, not branches.
 - **Spec per component** — auditable artifact; builders never guess from a half-remembered prompt.
 - **Builder model is per-component**, routed by complexity tag — cheap work stays cheap.
-- **QA always runs**; **Retro always runs** — the pipeline compounds knowledge over time.
+- **QA always runs**; **Retro always runs — backgrounded**, so it never blocks the report.
 - **Disciplines come from gstack** — design-before-build (`spec`), plan review (`autoplan`), root-cause debugging (`investigate`), and runtime + multi-lens QA (`qa`/`browse`/`review`/`design-review`/`health`) raise quality; the pipeline requires gstack (Phase 0 preflights).
 - **No auto-commit, no test files** — ship the change; the human commits when ready.
 

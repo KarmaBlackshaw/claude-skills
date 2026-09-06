@@ -5,7 +5,7 @@ description: Use when the user asks to implement, build, create, add, fix, or re
 
 # Plan-and-Build — architect-orchestrated, spec-driven, self-learning
 
-Every request flows through seven phases: **recall → brainstorm → plan (specialists → synthesis) → (scaled gate) → builders → QA → retro**. Discipline runs through all of them: skills-first, **design-before-build**, **root-cause debugging**, **evidence-before-claims**. The architect decides how many builders to spawn (1…N). Brainstorm scales to the work; QA and Retro ALWAYS run. The skill gets smarter each run by promoting lessons to long-term memory.
+Every request flows through seven phases: **recall → brainstorm → plan (specialists → synthesis) → (scaled gate) → builders → QA → retro**. **The pipeline right-sizes to the task via lanes — fast / standard / heavy (see *Velocity — right-size the ceremony* below) — but the floor gates run in every lane.** Discipline runs through all of them: skills-first, **design-before-build**, **root-cause debugging**, **evidence-before-claims**. The architect decides how many builders to spawn (1…N). Brainstorm scales to the work; QA ALWAYS runs; Retro ALWAYS runs but is **backgrounded** — it never blocks the report. The skill gets smarter each run by promoting lessons to long-term memory.
 
 You are the orchestrator. You dispatch agents and route results — you do not write source yourself.
 
@@ -21,12 +21,47 @@ Apply these all run. Where a gstack skill owns the discipline, **invoke it** at 
 |-----------|----------|-----------|
 | invoke relevant skills before acting | `using-skills.md` (local port) | all phases |
 | design-before-build → precise spec | **gstack `spec`** | Phase 1 |
-| plan review before dispatch | **gstack `autoplan`** | Phase 3 (multi-component / `[high]`) |
+| plan review before dispatch | **gstack `autoplan`** | Phase 3 (**heavy lane** only) |
 | root cause before any fix | **gstack `investigate`** | Phases 4–5 (fix loops) |
 | runtime + multi-lens verification | **gstack `qa` / `browse` / `review` / `design-review` / `health`** | Phase 5 |
+| pixel-fidelity to a cited Figma node | **`figma-to-vue` skill** + the Figma-match discipline below | Phases 1, 2b, 4, 5 (any Figma task) |
 | no completion claim without fresh evidence | `verifying.md` (local port) | Phases 4–6 + report |
 
 Memory (the accumulated DO/DON'T lessons) lives in **Obsidian**, not in this table — see Phase 0 and the Memory section.
+
+## Figma-match discipline (when the task cites a Figma node)
+
+A task that says "match / implement / build from Figma" (or pastes a `figma.com` URL) is a **pixel-fidelity** task, not a "make a plausible component" task. The failure mode this prevents: fixing the one element the ticket names, eyeballing it once, and shipping while the rest of the node still mismatches. Apply all four, every Figma task:
+
+1. **Route the build through the `figma-to-vue` skill's visual-match loop** — not a hand-written spec + one screenshot. `figma-to-vue` runs `inspect → map → outline → build → visual-match` (Playwright render-vs-node pixel diff, iterate until close). The bespoke spec still frames scope, but **acceptance = "the render matches the Figma node"**, never "matches my spec bullets".
+2. **Scope from the node's full element tree, not the file/ticket name.** Enumerate EVERY element in the node (heading, body, button, spacing, icon, color…) and compare each to the current render. Every element is in scope until a comparison proves it already matches. **Never write "assume X unchanged" / "already matches" without a Figma check** — that one unverified line is the classic miss.
+3. **Verify on the production data shape / live route, not a lone story variant.** A fixture that omits a field can silently dodge the exact branch that's broken (e.g. a title-only fixture centers, hiding a title+body left-align bug). Add/execute the fixture that matches real data, or drive the live route.
+4. **Measure, don't eyeball.** Pull the node's tokens (`get_variable_defs` / text styles: font-size, weight, line-height, alignment, spacing, color) and diff them against the code's *resolved* values (px → nearest Tailwind step, weight → `font-*`, alignment → `text-*`). A side-by-side render-vs-node screenshot is the final gate, at **every breakpoint the node defines**.
+
+## Velocity — right-size the ceremony (lanes)
+
+The pipeline scales to the task. Ceremony applied to a task that didn't need it adds latency, not quality — two reviewers finding the same bug isn't 2× quality. Route each request to a lane; the **floor gates run in EVERY lane**, only the scalable layer changes.
+
+**The floor (lane-independent — no lane may skip these):**
+- a spec / acceptance contract (≥1 sentence) — you can't verify "done" without it
+- build verification with **quoted** evidence (typecheck / lint / build) — the correctness floor
+- ≥1 `qa-reviewer` pass against the spec
+- root cause before any fix
+- runtime gate on user-facing work (a green build ≠ a working feature)
+- evidence-before-claims + no auto-commit
+
+**Lanes (scale ONLY the layer above the floor):**
+
+| Lane | When | Adds above the floor | Skips |
+|------|------|----------------------|-------|
+| **Fast** | trivial / small, unambiguous, low-risk, no `[high]` (≤ a couple of files) | nothing — one-line design, pb-architect plans directly, build, floor QA | gstack `spec`, Phase 2a fan-out, `autoplan`, per-component QA, whole-diff `review`, unflagged lenses |
+| **Standard** | typical feature / multi-file, some ambiguity, no `[high]` | gstack `spec`, Phase 2a→2b, QA runs only the lenses `QA emphasis` flags | `autoplan`, per-component QA split, whole-diff `review` |
+| **Heavy** | large / ambiguous / cross-cutting / any `[high]` | `autoplan` gate, per-component QA + integration pass, whole-diff `review`, all flagged lenses | — |
+
+**Routing rules (non-negotiable):**
+- **Ambiguity routes UP, never down.** Unsure between two lanes → take the heavier. Cheaper to over-review than ship a bug.
+- **Auto-escalate — upgrade the Phase-5 layer, don't rewind.** A lane whose QA surfaces a real blocker upgrades its **Phase-5 depth** for the re-run (per-component `qa-reviewer` + integration pass, whole-diff `review`, all flagged lenses), then re-enters the QA→fix loop. It does **not** rewind to Phase 3 — `autoplan` reviews a decomposition *before code exists*, so it can no longer do its job once builders have run. A blocker that is **decompositional** (wrong split, wrong partition) is the exception: re-dispatch `pb-architect`, and that re-plan takes the heavy lane.
+- **The floor is not part of the lane choice** — it always runs, whichever lane you picked.
 
 ## The loop
 
@@ -42,19 +77,25 @@ Memory (the accumulated DO/DON'T lessons) lives in **Obsidian**, not in this tab
 4. **If the repo is NOT wired to a vault** (`CLAUDE.local.md` absent, or no `LEARNINGS=`): **memory is best-effort — proceed without it, this is not a blocker.** Offer `/setup-obsidian-memory` once as a suggestion (never nag, never halt), and fall back to the skill-local `lessons.md` (read + write) for this run.
 
 ### Phase 1 — Brainstorm → spec (scaled, gstack `spec`)
-**Trivial** single-file/mechanical/unambiguous work → state the design in one sentence and go straight to the architect. **Non-trivial** (multi-component, new feature, ambiguous scope, user-facing behavior change) → **invoke gstack `spec`** to turn the request into a precise, executable spec: it explores intent, surfaces edge cases, and produces the "what / why / acceptance" contract. Present it and **get explicit approval before Phase 2**. Use `AskUserQuestion` for clarifying questions (batch related ones). Hand the approved `spec` output to the architect as its starting point (the architect decomposes it into per-component build specs — no overlap).
+**Trivial** single-file/mechanical/unambiguous work (**fast lane**) → state the design in one sentence and go straight to the architect. **Non-trivial** (multi-component, new feature, ambiguous scope, user-facing behavior change — **standard / heavy lane**) → **invoke gstack `spec`** to turn the request into a precise, executable spec: it explores intent, surfaces edge cases, and produces the "what / why / acceptance" contract. Present it and **get explicit approval before Phase 2**. Use `AskUserQuestion` for clarifying questions (batch related ones). Hand the approved `spec` output to the architect as its starting point (the architect decomposes it into per-component build specs — no overlap).
+
+**Figma tasks are never "trivial" on scope.** A cited Figma node/URL means the whole node is the contract, so apply the **Figma-match discipline** above: route the build through the `figma-to-vue` skill's visual-match loop, scope from the node's full element tree (not the file the ticket names), and make the acceptance criterion "render matches the node." A one-element fix on a Figma screen is the classic under-scope.
 
 ### Phase 2 — Plan (specialist fan-out → synthesis)
 Planning is split: **domain specialists plan their own slice, then one synthesizer partitions the whole.** This mirrors the skill's core rule — one agent planning every domain at once is itself a big, sloppy job (the bigger the job, the sloppier the output). It is also DRY: the specialists ARE the jeash role agents, so improving a jeash agent improves this pipeline too.
 
 **Phase 2a — Specialist planning (parallel, read-only).** Fan out ONLY the jeash specialist fields the task touches — `jeash:frontend` (Vue components/views/stores), `jeash:ux` (design/a11y/layout/design-system), `jeash:dx` (refactor/quality/type-safety) — one `Agent` call each in a single message. Each gets the approved design + a **read-only PLANNING contract** (template below): it explores the project for ITS domain and returns a **spec-fragment** (proposed units, the files it would own, the project conventions it found, the skills its domain needs, risks). **Specialists plan; they do not edit** — nothing is partitioned yet. Spawn one field or all three; skip fields the task doesn't touch. `jeash:review` and `jeash:qa` are **Phase-5 QA lenses, not planners** — their blocker findings route back to the owning executor via the Phase-5 fix loop; `jeash:architect` is unused here — pb-architect is the synthesizer.
 
-**Phase 2b — Synthesis (`pb-architect`, always).** Dispatch `pb-architect` (the plan-and-build synthesizer — **not** the `architect` orchestrator agent, which delegates teammates instead of writing specs) with every fragment pasted inline. It **integrates** the fragments (does NOT re-plan each domain — it trusts each specialist's domain call and resolves only cross-domain conflicts): reconciles overlaps and duplicated units, **discovers/confirms the project's conventions**, **splits so each builder has ONE single responsibility** (split until each job can be done at its finest), **partitions files so no two parallel builders share a file** (it is the **single partition authority**), groups into waves, tags complexity, **assigns per-spec skills + a per-component `QA emphasis`** from its **skill palette** (baked guidance skills, builder-invoke action skills, and the Phase-5 lenses) — all in each spec's `## Skills` section, writes one spec per component to `docs/research/components/<name>.spec.md`, and returns a **dispatch plan** (`builder | spec path | owned files | tag | wave | depends-on | skills`) + a **gate recommendation**. It is the **single decision point** for skill relevance — builders never discover skills, they only invoke the ones their spec names. Trivial work with no fragments → it plans directly from the design, as before.
+**Phase 2b — Synthesis (`pb-architect`, always).** Dispatch `pb-architect` (the plan-and-build synthesizer — **not** the `architect` orchestrator agent, which delegates teammates instead of writing specs) with every fragment pasted inline. It **integrates** the fragments (does NOT re-plan each domain — it trusts each specialist's domain call and resolves only cross-domain conflicts): reconciles overlaps and duplicated units, **discovers/confirms the project's conventions**, **splits so each builder has ONE single responsibility** (split until each job can be done at its finest), **partitions files so no two parallel builders share a file** (it is the **single partition authority**), groups into waves, tags complexity, **assigns per-spec skills + a per-component `QA emphasis`** from its **skill palette** (baked guidance skills, builder-invoke action skills, and the Phase-5 lenses) — all in each spec's `## Skills` section, writes one spec per component to `docs/research/components/<name>.spec.md`, and returns a **dispatch plan** (`builder | spec path | owned files | tag | wave | depends-on | skills`) + a **lane recommendation** (`fast` / `standard` / `heavy`) — pb-architect is the only agent that sees the whole decomposition, so it makes the lane call that drives Phase 3 and Phase 5 depth. It is the **single decision point** for skill relevance — builders never discover skills, they only invoke the ones their spec names. Trivial work with no fragments → it plans directly from the design, as before.
+- **Model:** pb-architect runs on **opus** — pinned in `agents/pb-architect.md`. A bad decomposition poisons everything downstream: every builder is briefed ONLY from its spec, and a bad split or partition isn't caught until QA, after the code exists. This is **one agent per run** — the cheapest place in the pipeline to buy judgment, and the lane gates never review it on fast/standard. Do not downgrade it to shave latency. (Unconditional by design: an `[high]`-keyed switch is unimplementable — `[high]` is pb-architect's *own output*, so it cannot be read before dispatching it. If a cheaper fast-lane synthesis is ever wanted it costs a file — a sonnet sibling routed by **lane**, which IS known at Phase 2 — never a sentence no dispatch path can perform.)
 - If any specialist or pb-architect returns clarifying questions, ask the user via `AskUserQuestion` before continuing.
+- **Figma tasks:** pb-architect scopes each spec from the node's **full element tree** (Figma-match discipline #2), never from the file/ticket name — no element is out of scope until a render-vs-node comparison shows it already matches. The spec's Acceptance criteria must include "render matches the node at every breakpoint it defines," and its `QA emphasis` must name the render-vs-node visual-match gate.
 
-### Phase 3 — Scaled gate (gstack `autoplan` on the plan)
-- **Single simple builder** (one `[low]`/`[med]` component, architect says `auto-proceed`) → proceed, no stop.
-- **Multi-component OR any `[high]`** → **run gstack `autoplan`** over the architect's specs + dispatch plan first (auto CEO/design/eng/DX review — catches a bad decomposition before any code is written), fold its decisions into the plan, then show the plan + review outcome and wait for explicit "go" / "approve".
+### Phase 3 — Scaled gate (lane-based)
+**Take the lane from pb-architect's `lane recommendation` (Phase 2b)** — it saw the whole decomposition. Override it only upward, never downward.
+- **Fast lane** (one `[low]`/`[med]` component, `auto-proceed`) → proceed, no stop.
+- **Standard lane** (multi-file, no `[high]`) → show the plan + dispatch plan, wait for explicit "go" — **no `autoplan`** (a well-understood decomposition doesn't need the quad review).
+- **Heavy lane** (any `[high]`, or cross-cutting / ambiguous multi-component) → **run gstack `autoplan`** over the specs + dispatch plan first (auto CEO/design/eng/DX review — catches a bad decomposition before any code is written), fold its decisions in, then show the plan + review outcome and wait for explicit "go" / "approve".
 
 ### Phase 4 — Build (collision-free, model-routed)
 Execute the dispatch plan wave by wave:
@@ -82,16 +123,17 @@ Blocked builder → escalate one tier (haiku → sonnet → opus). Opus blocked 
 
 ### Phase 5 — QA (always, tiered) — two verdicts + runtime
 **Static (`qa-reviewer` subagent):**
-- **Lightweight** (single/simple build): one `qa-reviewer` over the whole diff; orchestrator runs the project's build/lint/typecheck.
-- **Heavy** (multi-component): one `qa-reviewer` **per component** (parallel, each scoped to its spec + owned files), then a final integration pass.
+- **Fast / standard lane** (single/simple build): one `qa-reviewer` over the whole diff; orchestrator runs the project's build/lint/typecheck.
+- **Heavy lane** (multi-component): one `qa-reviewer` **per component** (parallel, each scoped to its spec + owned files), then a final integration pass.
 
 QA returns **two verdicts per component: spec-compliance AND code-quality** — plus the quoted typecheck/lint/build output (`verifying.md` — no PASS without evidence).
 
-**Runtime + multi-lens (gstack, orchestrator-invoked after the static pass):** a green build is not a working feature. **Run each component's flagged lenses** — the `QA emphasis` line pb-architect put in its spec names exactly which of these apply (UI component → `qa`/`design-review`; risky logic → `review`/`health`) — plus one whole-diff `review`.
+**Runtime + multi-lens (gstack, orchestrator-invoked after the static pass):** a green build is not a working feature. **Run ONLY the lenses the spec's `QA emphasis` flags, and run them in parallel** — one message, multiple invocations; they are independent read passes, so never serialize them, and an unflagged lens does not run. UI component → `qa`/`design-review`; risky logic → `review`/`health`. Add one whole-diff `review` on the **heavy lane** only. (The runtime gate on user-facing work is floor — it runs in every lane, so `qa` is always flagged when the change is user-facing.)
 - **gstack `qa`** — drive the running app through the changed flow (click-test, console errors, broken states) whenever the work is user-facing. This is the runtime gate.
 - **gstack `review`** — a pre-landing multi-lens read of the whole diff (architecture / reuse / conventions), complementing per-component spec checks.
 - **gstack `design-review`** — designer's-eye pass (spacing, hierarchy, AI-slop, slow interactions) when the change touches UI.
 - **gstack `health`** — code-quality dashboard to confirm the change didn't drag quality down.
+- **Figma tasks — render-vs-node visual-match gate.** The runtime gate is a **side-by-side of the render against the Figma node at every breakpoint the node defines**, driven on the **production data shape / live route** (never a lone story variant that can dodge the broken branch), with the node's tokens diffed against the code's resolved values (Figma-match discipline #3–#4). "Looks right in one story" is not the gate — "matches the node" is.
 
 Fold every real finding from these into the fix loop below alongside the `qa-reviewer` verdicts.
 
@@ -106,10 +148,10 @@ re-run QA on the SAME scope. Repeat until both verdicts pass or **3 rounds**. St
 across all components. The spec is the contract — no spec satisfied, not done.
 
 ### Phase 6 — Retro (always, self-learning → Obsidian)
-Dispatch the `retro` agent with: what required rework, repeated QA findings, user corrections, and what worked. It distills **generalizable** (cross-project) lessons and **promotes them to the Obsidian hub via the sync-brain Promotion gate** — an atomic note in the `LEARNINGS` notes dir + one index line — while the run summary goes to the spoke (`ACTIVE_CONTEXT`). Deduped; most runs promote nothing to the hub. When the repo isn't wired to a vault, it appends to the skill-local `lessons.md` fallback instead. This is how the skill knows what and what NOT to do next time.
+**Runs in the background — the Report ships without waiting on it; retro writes memory async.** Dispatch the `retro` agent with: what required rework, repeated QA findings, user corrections, and what worked. It distills **generalizable** (cross-project) lessons and **promotes them to the Obsidian hub via the sync-brain Promotion gate** — an atomic note in the `LEARNINGS` notes dir + one index line — while the run summary goes to the spoke (`ACTIVE_CONTEXT`). Deduped; most runs promote nothing to the hub. When the repo isn't wired to a vault, it appends to the skill-local `lessons.md` fallback instead. This is how the skill knows what and what NOT to do next time.
 
 ### Report
-Components built · specs written (count should match builders) · files changed · build/lint/typecheck status (quoted) · QA findings (both verdicts) · lessons promoted. **No "done" without fresh verification evidence** (`verifying.md`) and the spec-satisfaction gate passed. Then ask before any git op.
+Components built · specs written (count should match builders) · files changed · build/lint/typecheck status (quoted) · QA findings (both verdicts) · lessons promoted. **No "done" without fresh verification evidence** (`verifying.md`) and the spec-satisfaction gate passed. **Deliver the report immediately — Retro (Phase 6) runs async and never gates it.** Then ask before any git op.
 
 ## Agents (all bundled in this skill)
 
@@ -154,7 +196,7 @@ No worktrees. Safety comes from the architect's file partitioning: each builder 
 - **ALWAYS recall Obsidian memory when the repo is wired** — every run, confirmed present (not assumed), and injected into every agent prompt. Not wired → memory is best-effort; **proceed without it (never a blocker)**, offer `/setup-obsidian-memory` once. Never hardcode vault paths.
 - **Specs are mandatory.** No builder without its spec file in `docs/research/components/`.
 - **Self-contained subagent prompts.** Subagents have zero context — brief every dispatch from scratch and paste the spec + lessons + disciplines inline. No "as discussed above".
-- **QA and Retro always run** — even for a single-builder task.
+- **QA and Retro always run** — even for a single-builder task. Retro runs **in the background** and never blocks the report. **Lanes scale ceremony but NEVER skip a floor gate** (see Velocity — spec/verify/QA/root-cause/runtime-on-UI run in every lane).
 - **Conventions come from the project**, never hardcoded — discover and obey them.
 - **One builder = one job.** The architect splits until each builder has a single responsibility; big multi-purpose dispatches produce sloppy work. See the architect's split triggers.
 
@@ -266,3 +308,18 @@ issues. Do not edit.
 | One-shot build, no self-check | Builder loops vs acceptance criteria until satisfied (max 3 iterations) |
 | Endless QA ↔ fix ping-pong | Bound to 3 rounds, then halt + surface — never ship unsatisfied |
 | Reporting done with unmet criteria | Spec-satisfaction gate: every acceptance box must be true first |
+| Figma task: fixing only the element the ticket names, rest of the node still off | Scope from the node's full element tree — every element in scope until compared (Figma-match #2) |
+| "Heading already matches — don't change it" with no Figma check | Ban unverified "unchanged"/"already matches" on a Figma task; compare every element (Figma-match #2) |
+| QA'd against a story fixture that dodged the broken branch | Verify on the production data shape / live route (Figma-match #3) |
+| Eyeballing a Figma match instead of measuring; one screenshot ≠ the gate | Diff node tokens vs resolved Tailwind values + side-by-side render at each breakpoint (Figma-match #1, #4) |
+| Same ceremony for a one-line change and a big feature | Right-size via lanes — fast / standard / heavy (see Velocity) |
+| Fast/standard lane skips a floor gate (spec / verify / QA / root-cause / runtime-on-UI) | The floor is lane-independent — every lane runs it; lanes scale only the layer above it |
+| Unsure which lane → picked the lighter one | Ambiguity routes UP; unsure → heavier lane, then auto-escalate if QA finds a blocker |
+| Running all four gstack lenses on every change | Run ONLY the lenses `QA emphasis` flags, in parallel; whole-diff `review` on heavy lane only |
+| Serializing the Phase-5 lenses | They're independent read passes — one message, parallel |
+| Blocking the report on Retro | Retro is backgrounded — ship the report, retro writes memory async |
+| Downgrading pb-architect to shave latency | Synthesis always runs on **opus** — one agent per run, and on fast/standard lanes no gate reviews its decomposition. A bad partition costs a rebuild; the latency saved is seconds |
+| Describing a conditional model switch in prose | No dispatch path can perform it — frontmatter `model:` binds. A real switch costs a sibling agent file routed by **lane** (known at Phase 2), never by `[high]` (pb-architect's own output) |
+| Spec ships with an empty/absent `QA emphasis` on user-facing work | Phase 5 then runs ZERO lenses — pb-architect MUST flag gstack `qa` on anything user-facing (floor); every spec carries the line, `none` only with a stated reason |
+| A spec flags whole-diff `review` on a fast/standard lane | `review` is heavy-lane-only — flagging it elsewhere puts two written rules in conflict |
+| `autoplan` on every multi-component task | `autoplan` is the heavy lane only (any `[high]` / cross-cutting / ambiguous) |
