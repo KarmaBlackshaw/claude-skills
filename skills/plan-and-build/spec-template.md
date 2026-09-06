@@ -19,7 +19,12 @@
 > Architect fills both lists (Phase 2, step 7). Builder reads this FIRST.
 - **Baked — already applied by the architect, do NOT re-invoke:** <skill names, or "none"> — their concrete rules are folded into the Conventions checklist below.
 - **Builder MUST invoke before coding (action skills):** <skill names, or "none"> — invoke each via the `Skill` tool, follow it, THEN build. Do not invoke any skill not listed here.
-- **QA emphasis (Phase 5 — the ORCHESTRATOR runs these, not the builder):** <gstack lens names, or "none"> — the runtime/multi-lens skills this component needs (e.g. `qa`/`browse` for a flow, `design-review` for UI, `review`/`health` for risky logic). The builder ignores this line.
+- **QA emphasis (Phase 5 — the ORCHESTRATOR runs these, not the builder):** <gstack lens names, or "none — <why>"> — the runtime/multi-lens skills this component needs (`qa` to drive a flow, `design-review` for UI, `health` for risky logic; `review` is whole-diff and **heavy-lane only** — flag it only on a heavy-lane run). The builder ignores this line.
+  > **REQUIRED — Phase 5 runs ONLY the lenses named here, so a blank line means NO QA lenses run.**
+  > If this component's change is user-facing at runtime — including a store, composable, or logic
+  > change that drives a visible flow — this line MUST name gstack `qa`. The runtime gate is
+  > lane-independent floor and cannot be dropped as "not needed". Never leave this field absent or
+  > blank: write `none — <reason>` and state why no lens applies.
 
 ## Public API
 - **Inputs / props:** <names + types>
