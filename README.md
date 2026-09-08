@@ -6,7 +6,7 @@ A personal collection of [Claude Code](https://docs.claude.com/en/docs/claude-co
 
 | Skill | Description |
 |-------|-------------|
-| [`figma-to-vue`](./skills/figma-to-vue) | Convert Figma designs into Vue 3 + Tailwind components via a 4-step workflow (inspect → map → outline → build) that prevents the usual failure modes — guessing hex codes, rounding spacing, misreading hierarchy. |
+| [`figma-to-vue`](./skills/figma-to-vue) | Convert Figma designs into Vue (2 or 3) + Tailwind components via a 5-step workflow (inspect → map → outline → build → visual-match) that prevents the usual failure modes — guessing hex codes, rounding spacing, misreading hierarchy — then closes with a Playwright render-vs-node pixel-diff loop. |
 | [`plan-and-build`](./skills/plan-and-build) | Architect-orchestrated, spec-driven, self-learning build pipeline — 7 phases (recall → brainstorm → plan → gate → build → QA → retro), right-sized by fast/standard/heavy lanes over a lane-independent floor (spec, quoted build evidence, ≥1 QA pass, root-cause-before-fix, runtime gate on user-facing work). Builders routed by complexity tag to haiku/sonnet/opus. No auto-commit. No test-file writes. Bundles 6 subagents. **Requires gstack.** |
 | [`tailwind-color-token`](./skills/tailwind-color-token) | Converts arbitrary hex color values to named Tailwind design tokens. Checks `tailwind.config.js` before asking, batches multiple new hexes, inserts tokens into `theme.extend.colors`, and rewrites the raw hex in code. |
 

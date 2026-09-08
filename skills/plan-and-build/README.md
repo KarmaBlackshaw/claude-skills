@@ -72,7 +72,7 @@ user: "implement / build / fix / refactor <X>"
    │                         root cause before fix · no ✅ without quoted verify output
    ├── Phase 5  QA           tiered: 1 qa-reviewer (simple) or 1-per-component (complex)
    │                         two verdicts (spec + code-quality); blockers routed back to builder;
-   │                         only the lenses the spec's QA emphasis flags, run in parallel
+   │                         only the lenses the spec's QA emphasis flags; lenses report, builders fix
    └── Phase 6  Retro        distill generalizable lessons → promote to Obsidian hub — backgrounded
 ```
 
