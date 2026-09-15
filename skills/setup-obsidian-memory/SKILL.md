@@ -13,6 +13,8 @@ Bootstraps hub-and-spoke long-term memory into the **current repo**: a shared Ob
 
 **Capture/synthesis pipeline (replaces the old Stop-hook push).** `obsidian-capture.sh` (SessionEnd) queues the finished session into `~/.claude/sync-brain/queue/` and kicks a detached `obsidian-drain.sh`; the drain synthesizes each queued session out-of-band via a headless `claude` run that writes the spoke, then archives it. Editorial judgment (headline / learnings) is out of the hot path, so there is no "correction not saved" problem. `obsidian-push.sh` is retired.
 
+**Recall is two-tier.** Session start injects the always-on layer (Standards → Coding Rules → Active Context → open Threads) plus the Learnings **indexes** — narrowed to the repo's **domains**, auto-detected from its manifests (`package.json` deps → Frontend / Mobile / Backend-Data, `supabase/` or `*.sql` or `pyproject`/`go.mod` → Backend-Data; Workflow always; no manifest → Workflow only). `DOMAINS=` in the pointer overrides detection (`all` = every spoke). Lesson **bodies** are never injected up front: `obsidian-retrieve.sh` scores every memory unit — rule bullets from all three Standards tiers, `###` lessons in the org **and** global spokes, legacy one-lesson-per-file atomic notes — against each prompt (UserPromptSubmit) and each file about to be edited (PreToolUse on Edit/Write), and injects the top matches in full, once per session, right where attention is strongest. Growth in the vault costs nothing per session — only the matched units ever load.
+
 **REQUIRED COMPANION:** the `sync-brain` skill does the runtime read/write. This skill only wires the plumbing. If `~/.claude/skills/sync-brain/` is missing, tell the user to install it (same agentic-ai skills repo) before relying on push/pull.
 
 ## When to use
@@ -23,7 +25,8 @@ Bootstraps hub-and-spoke long-term memory into the **current repo**: a shared Ob
 ## What gets created
 | Target | Purpose |
 |---|---|
-| `<vault>/Learnings.md` | Global cross-repo hub **index** (MOC; created once, reused by every repo) |
+| `<vaults-root>/Learnings.md` + `Learnings/` | **Global lessons** tier — cross-org, cross-stack insights (one index + spokes above all vaults, mirroring `GLOBAL_STANDARDS`; created once) |
+| `<vault>/Learnings.md` | **Org lessons** hub **index** (MOC; created once, reused by every repo in this vault) |
 | `<vault>/Learnings/` | Domain **spoke** files (`Frontend.md`, `Backend-Data.md`, `Mobile.md`, `Workflow.md`) holding lesson detail; the hub path minus its extension |
 | `<vault>/Standards.md` | **Org-shared coding standards** (one per vault; injected in full every session — the cross-repo convention layer) |
 | `<vault>/Projects/<repo>/<repo>.md` | This repo's session-log spoke — the **folder-note** (frontmatter-tagged `project/<repo>`); its sibling conventions note is `<repo> — Coding Rules.md` |
@@ -33,7 +36,9 @@ Bootstraps hub-and-spoke long-term memory into the **current repo**: a shared Ob
 | `~/.claude/hooks/obsidian-recall.sh` | SessionStart → injects memory into context (skips `compact`) |
 | `~/.claude/hooks/obsidian-capture.sh` | SessionEnd → queues the session + kicks the drain |
 | `~/.claude/hooks/obsidian-drain.sh` | SessionStart (async catch-up) + detached from capture → synthesizes queued sessions into their spoke |
-| `~/.claude/settings.json` | registers all three, once, machine-wide |
+| `~/.claude/hooks/obsidian-retrieve.sh` | UserPromptSubmit + PreToolUse(Edit\|Write) → injects the lesson bodies that match the prompt / edited file (point-of-use recall) |
+| `~/.claude/hooks/obsidian-domains.sh` | sourced by recall + retrieve — detects the repo's Learnings domains from its manifests (`DOMAINS=` overrides) |
+| `~/.claude/settings.json` | registers all four, once, machine-wide |
 
 Assets referenced below (`assets/…`) live in this skill's base directory (shown when the skill loads). Set `SKILL_DIR` to that path.
 
@@ -57,17 +62,21 @@ Store the chosen root as `VAULT`. Define paths (the spoke is a **folder-note**: 
 - `THREADS="$VAULT/Projects/$NAME/$NAME — Threads.md"`
 - `LEARNINGS="$VAULT/Learnings.md"`
 - `STANDARDS="$VAULT/Standards.md"`  (org-shared standards — one per vault, shared by every repo in this org)
+- `GLOBAL_STANDARDS="$(dirname "$VAULT")/Standards.md"`  (cross-org, cross-stack baseline — ONE file above all vaults, shared by every repo everywhere)
+- `GLOBAL_LEARNINGS="$(dirname "$VAULT")/Learnings"`  (cross-org lessons tier — `Learnings.md` index + `Learnings/` spokes above all vaults; the hooks derive it from `LEARNINGS`, so the pointer key is only needed for a non-standard layout)
 
 ### 3. Create vault notes (NEVER overwrite existing)
 - Create `LEARNINGS` (the index) only if missing — use the **Learnings seed** below.
 - Create the spokes folder: `mkdir -p "${LEARNINGS%.md}"` (i.e. `<vault>/Learnings/`). Domain spoke files are created/appended later by `/sync-brain push`.
-- Create `STANDARDS` (`$VAULT/Standards.md`) only if missing — use the **Standards seed** below. This is the org-shared convention layer, injected in full every session; seed it from the conventions common to this org's repos.
+- Create `STANDARDS` (`$VAULT/Standards.md`) only if missing — use the **Standards seed** below. This is the org-shared convention layer, injected in full every session; seed it from the conventions common to this org's repos. Put **only org-specific** rules here — anything true across orgs and stacks belongs one tier up in `GLOBAL_STANDARDS`.
+- Create `GLOBAL_LEARNINGS.md` (the global index) + the `GLOBAL_LEARNINGS/` dir only if missing — same shape as the **Learnings seed** below, titled *Global Learnings (cross-org, cross-stack)*. A lesson lands there only via `/sync-brain push` check D (holds in a different org AND stack).
+- Create `GLOBAL_STANDARDS` only if missing — the cross-org baseline, one file for every vault. The recall hook injects it **ungated** (before the org file, and even in repos with no `CLAUDE.local.md`), so it never needs a `KEY=` line unless the vault root is non-standard; the hook defaults to `$HOME/Documents/obsidian/Standards.md`, overridable via the `OBSIDIAN_GLOBAL_STANDARDS` env var.
 - Create `ACTIVE` only if missing (`mkdir -p "$VAULT/Projects/$NAME"`) — use the **Active Context seed** below, substituting `<repo>` and the project's stack. The seed's `tags: [project/<repo>]` frontmatter is what makes this project one labeled hub node in the graph (see **Graph project tag** below).
 - Create `THREADS` only if missing — use the **Threads-ledger seed** below (same `project/<repo>` tag). It starts as an empty table; `/sync-brain push` fills it.
 - **Seed the graph config** (per vault, once): if `"$VAULT/.obsidian/graph.json"` does not exist, copy `"$SKILL_DIR/assets/graph.json"` there. It turns on tag nodes and color-codes lessons / spokes / conventions / project facts. Never overwrite an existing one — the user may have tuned it.
 
 ### 4. Write the pointer (`CLAUDE.local.md`)
-Create `$REPO/CLAUDE.local.md` from the **Pointer seed** below, substituting the real absolute paths into the machine-readable `KEY=value` block. **Do NOT touch the committed `CLAUDE.md`** — it stays authoritative for code conventions.
+Create `$REPO/CLAUDE.local.md` from the **Pointer seed** below, substituting the real absolute paths into the machine-readable `KEY=value` block. Domains are **auto-detected** from the repo's manifests — leave `DOMAINS=` out. Set it only to override: `DOMAINS=Frontend,Workflow` to pin, `DOMAINS=all` to see every spoke. Check what detection picked in the Verify step (the recall output says `filtered to …`). **Do NOT touch the committed `CLAUDE.md`** — it stays authoritative for code conventions.
 
 ### 5. Gitignore the pointer
 ```bash
@@ -78,7 +87,7 @@ git -C "$REPO" check-ignore CLAUDE.local.md >/dev/null 2>&1 || printf '\n# Claud
 ```bash
 bash "$SKILL_DIR/assets/sync-hooks.sh"
 ```
-One command, no repo arg: copies the current `obsidian-recall.sh` + `obsidian-capture.sh` + `obsidian-drain.sh` into `~/.claude/hooks/` and merges the three hooks into `~/.claude/settings.json` only if absent. Idempotent — a no-op if already installed. Because wiring is by `CLAUDE.local.md` presence, once this has run once the repo you just pointed (Step 4) is already wired; there is nothing per-repo to install. Settings are never edited by hand.
+One command, no repo arg: copies the current `obsidian-recall.sh` + `obsidian-capture.sh` + `obsidian-drain.sh` + `obsidian-retrieve.sh` + `obsidian-domains.sh` into `~/.claude/hooks/` and merges the hooks into `~/.claude/settings.json` only if absent. Idempotent — a no-op if already installed. Because wiring is by `CLAUDE.local.md` presence, once this has run once the repo you just pointed (Step 4) is already wired; there is nothing per-repo to install. Settings are never edited by hand.
 
 ### 7. Conflict check (critical)
 A Stop/PostCompact hook that does `cat >` on a vault file will **clobber** the spoke on every fire. Scan both settings for one:
@@ -96,6 +105,10 @@ bash "$HOME/.claude/hooks/obsidian-recall.sh" SessionStart | jq -e '.hookSpecifi
 printf '{"cwd":"%s","session_id":"verify-x","transcript_path":""}' "$REPO" | SYNC_BRAIN_NO_SPAWN=1 bash "$HOME/.claude/hooks/obsidian-capture.sh" \
   && [ -f "$HOME/.claude/sync-brain/queue/verify-x.meta" ] && echo "capture hook ok" && rm -f "$HOME/.claude/sync-brain/queue/verify-x.meta"
 git -C "$REPO" check-ignore CLAUDE.local.md >/dev/null && echo "pointer gitignored"
+# retrieval: a prompt naming a lesson's subject must pull that lesson body (pick a header from a spoke)
+printf '{"cwd":"%s","session_id":"verify-x","hook_event_name":"UserPromptSubmit","prompt":"<words from a lesson ### header>"}' "$REPO" \
+  | bash "$HOME/.claude/hooks/obsidian-retrieve.sh" | jq -e '.hookSpecificOutput.additionalContext' >/dev/null && echo "retrieve hook ok"
+bash "$SKILL_DIR/assets/test_retrieve.sh"   # plumbing self-check, no tokens
 ```
 Then tell the user: **fully restart Claude Code** (quit, not just close the window) — hooks load at session start.
 
@@ -201,8 +214,11 @@ tags: [project/<repo>]
 ACTIVE_CONTEXT=<ACTIVE path>
 LEARNINGS=<LEARNINGS path>
 STANDARDS=<vault>/Standards.md
+GLOBAL_STANDARDS=<vaults-root>/Standards.md
 CODING_RULES=<vault>/Projects/<repo>/<repo> — Coding Rules.md
 THREADS=<vault>/Projects/<repo>/<repo> — Threads.md
+DOMAINS=<optional override — auto-detected from manifests when absent; `all` = every spoke>
+GLOBAL_LEARNINGS=<vaults-root>/Learnings   (optional — derived from LEARNINGS when absent)
 -->
 ```
 
@@ -249,4 +265,7 @@ Mechanically folds a repo's native memory store into its Obsidian spoke (routes 
 | Non-idempotent re-runs | Guard settings + gitignore edits (the provided scripts already do) |
 | A hook present on disk but unregistered | Present ≠ wired — always run the Verify step |
 | A `cat >` memory-write hook | It clobbers the note; must append (Step 7) |
+| Injecting lesson bodies at session start | They land ~100K tokens before they matter and get "forgotten"; index up front, bodies via `obsidian-retrieve.sh` at point of use |
+| `DOMAINS=` naming a spoke that doesn't exist | Spell it as the file: `Frontend`, `Backend-Data`, `Mobile`, `Workflow`. (A vault with none of the named spoke files — a legacy atomic-note vault — is read whole, so a typo silences nothing, it just stops filtering.) |
+| Detection picked the wrong stack | Check the recall output's `filtered to …`; pin with `DOMAINS=` in the pointer |
 | Global reg + leftover per-repo reg | Fires hooks twice per event — run `migrate-to-global.sh` on legacy repos |

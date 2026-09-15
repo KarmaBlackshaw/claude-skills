@@ -13,6 +13,8 @@
 #                                       detached one kicked by capture)
 #   SessionEnd   : obsidian-capture.sh (synchronous + timeout — never async, or
 #                                       it can be killed mid-write at teardown)
+#   UserPromptSubmit / PreToolUse(Edit|Write|MultiEdit) : obsidian-retrieve.sh
+#                                       (point-of-use lesson bodies; ms, timeout 5)
 # Usage: register-hooks.sh   (override target with CLAUDE_SETTINGS=…)
 set -euo pipefail
 
@@ -24,9 +26,10 @@ H="$HOME/.claude/hooks"
 RECALL="bash \"$H/obsidian-recall.sh\" SessionStart"
 DRAIN="bash \"$H/obsidian-drain.sh\""
 CAPTURE="bash \"$H/obsidian-capture.sh\""
+RETRIEVE="bash \"$H/obsidian-retrieve.sh\""
 
 tmp="$(mktemp)"
-jq --arg recall "$RECALL" --arg drain "$DRAIN" --arg capture "$CAPTURE" '
+jq --arg recall "$RECALL" --arg drain "$DRAIN" --arg capture "$CAPTURE" --arg retrieve "$RETRIEVE" '
   def present(cmd; ev): ([ (.hooks[ev] // [])[].hooks[]?.command ] | any(. == cmd));
   .hooks = (.hooks // {})
   | (if present($recall; "SessionStart") then . else
@@ -39,6 +42,12 @@ jq --arg recall "$RECALL" --arg drain "$DRAIN" --arg capture "$CAPTURE" '
   | (if present($capture; "SessionEnd") then . else
       .hooks.SessionEnd = ((.hooks.SessionEnd // []) +
         [{hooks:[{type:"command",command:$capture,timeout:5,statusMessage:"Queuing session for Obsidian"}]}]) end)
+  | (if present($retrieve; "UserPromptSubmit") then . else
+      .hooks.UserPromptSubmit = ((.hooks.UserPromptSubmit // []) +
+        [{hooks:[{type:"command",command:$retrieve,timeout:5}]}]) end)
+  | (if present($retrieve; "PreToolUse") then . else
+      .hooks.PreToolUse = ((.hooks.PreToolUse // []) +
+        [{matcher:"Edit|Write|MultiEdit",hooks:[{type:"command",command:$retrieve,timeout:5}]}]) end)
 ' "$S" > "$tmp" && mv "$tmp" "$S"
 
 jq empty "$S" && echo "registered global obsidian hooks ✓ ($S)"

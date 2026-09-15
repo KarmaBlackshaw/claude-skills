@@ -12,7 +12,7 @@ DEST="${CLAUDE_HOOKS_DIR:-$HOME/.claude/hooks}"
 mkdir -p "$DEST"
 
 # obsidian-push.sh is retired (superseded by capture/drain) — not installed.
-for f in obsidian-recall.sh obsidian-capture.sh obsidian-drain.sh; do
+for f in obsidian-recall.sh obsidian-capture.sh obsidian-drain.sh obsidian-retrieve.sh obsidian-domains.sh; do
   cp "$SRC/$f" "$DEST/$f"; chmod +x "$DEST/$f"
 done
 
