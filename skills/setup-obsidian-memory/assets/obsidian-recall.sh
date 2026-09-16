@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Injects Obsidian long-term memory (Learnings + Coding Rules + Active Context) into context.
-# SessionStart + SubagentStart hook. Reads absolute vault paths from the repo's gitignored
+# SessionStart hook. Reads absolute vault paths from the repo's gitignored
 # CLAUDE.local.md so no personal paths live in git.
 # No-ops silently if CLAUDE.local.md or the target files are missing.
 # Arg $1 = hook event name (default: SessionStart).
@@ -17,9 +17,7 @@ input=""; [ -t 0 ] || input="$(cat)"
 SID="$(printf '%s' "$input" | jq -r '.session_id // empty' 2>/dev/null || true)"
 # Fresh context (startup/resume/clear/compact) => let obsidian-retrieve.sh
 # re-inject lessons this session already saw; they are gone from context now.
-# A subagent shares the parent's session id — clearing here would re-inject
-# into the parent's next prompt, so only a real SessionStart clears.
-[ -n "$SID" ] && [ "$EVENT" != SubagentStart ] && rm -f "${SYNC_BRAIN_HOME:-$HOME/.claude/sync-brain}/seen/$SID"
+[ -n "$SID" ] && rm -f "${SYNC_BRAIN_HOME:-$HOME/.claude/sync-brain}/seen/$SID"
 CWD="$(printf '%s' "$input" | jq -r '.cwd // empty' 2>/dev/null || true)"
 ROOT="${CWD:-${CLAUDE_PROJECT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}}"
 PTR="$ROOT/CLAUDE.local.md"
@@ -54,27 +52,16 @@ GLOBAL_LEARNINGS="$(getpath GLOBAL_LEARNINGS)"
 # through whole. Lesson bodies arrive on demand via obsidian-retrieve.sh anyway.
 filter_index() { awk -v d="$DOMAINS" 'BEGIN{n=split(d,D,",")} /^### \[\[/{insec=1; keep=(n==0); for(i=1;i<=n;i++){gsub(/ /,"",D[i]); if(index($0,"[[" D[i] "]]")) keep=1}} !insec||keep' "$1"; }
 
-# Sections in priority order. The harness inlines a hook's additionalContext
-# only up to 10,000 chars — past that it persists the whole blob to a file and
-# injects a 2 KB preview, so a 30 KB "full" injection silently became 2 KB of
-# it. Pack whole sections under BUDGET (rules tiers first — they are the
-# always-on baseline), spill the rest to a file, and point at it.
+# The always-on tiers (global/org Standards, repo Coding Rules, Learnings index)
+# are NOT emitted here any more — they reach the system prompt of the session and
+# of every subagent through CLAUDE.md `@path` imports (register-imports.sh). This
+# hook carries only the session-scoped remainder: open Threads and Active Context.
+# The harness inlines a hook's additionalContext only up to 10,000 chars (past
+# that: a 2 KB preview + a file path), so pack whole sections under BUDGET and
+# spill the rest to a file with a pointer.
 BUDGET="${RECALL_BUDGET:-9400}"
 titles=(); bodies=()
 add() { [ -n "$2" ] && { titles+=("$1"); bodies+=("$2"); }; }
-# UNGATED — every repo gets this, wired to a vault or not. In FULL, and first,
-# because it is the always-on baseline everything else specializes.
-[ -f "$GLOBAL_STANDARDS" ] && add "Global Coding Standards (Obsidian — every repo, every org, every stack)" "$(cat "$GLOBAL_STANDARDS")"
-# Org standards: conventions for every repo in this org's vault — the tier below
-# the global baseline. Injected in FULL (unlike Learnings) because they apply to
-# all work, not just situationally. Keep the file tight.
-[ -n "$STANDARDS" ] && [ -f "$STANDARDS" ] && add "Org Coding Standards (Obsidian — shared across this org's repos)" "$(cat "$STANDARDS")"
-[ -n "$RULES" ] && [ -f "$RULES" ] && add "Coding Rules — this repo (Obsidian spoke)" "$(cat "$RULES")"
-# Learnings: the index (MOC) ONLY — one summary line per lesson, grouped by
-# domain spoke. Bodies live in Learnings/<Spoke>.md and arrive on demand via
-# obsidian-retrieve.sh, never up front.
-[ -n "$GLOBAL_LEARNINGS" ] && [ -f "$GLOBAL_LEARNINGS.md" ] && add "Global Learnings (Obsidian — cross-org lessons index${DOMAINS:+, filtered to $DOMAINS})" "$(filter_index "$GLOBAL_LEARNINGS.md")"
-[ -n "$LEARNINGS" ] && [ -f "$LEARNINGS" ] && add "Org Learnings (Obsidian hub — index${DOMAINS:+, filtered to $DOMAINS})" "$(filter_index "$LEARNINGS")"
 # Open threads: only the ledger's `open` rows — unfinished action items that
 # survived session rotation. Done rows stay out of context.
 if [ -n "$THREADS" ] && [ -f "$THREADS" ]; then
@@ -85,8 +72,7 @@ fi
 
 [ "${#titles[@]}" -eq 0 ] && exit 0
 
-pre="Obsidian long-term memory (hub-and-spoke). Read before architectural changes; persist with /sync-brain push.
-The Learnings indexes are tables of contents only — lesson BODIES (and the rule bullets that apply) are auto-injected per prompt / per edited file by obsidian-retrieve.sh. When a 'Memory matched' block appears, apply it."
+pre="Obsidian long-term memory (hub-and-spoke). Standards and the Learnings index are already in your system prompt (CLAUDE.md imports); lesson BODIES arrive per prompt / per opened file as 'Memory matched' blocks — apply them. Persist with /sync-brain push."
 SPILL_DIR="${SYNC_BRAIN_HOME:-$HOME/.claude/sync-brain}/recall"; mkdir -p "$SPILL_DIR"
 spill="$SPILL_DIR/${SID:-$$}.md"; : > "$spill"
 inline=""; spilled=(); total=${#pre}

@@ -38,7 +38,7 @@ Not declared in the manifest — install separately:
 - **superpowers** plugin — `superpowers:dispatching-parallel-agents`, `superpowers:verification-before-completion`.
 - **Local skills** from this repo / `~/.claude/skills` — `feature-dev`, `plan-and-build`, `code-review-branch`, `figma-to-vue`, `tailwind-color-token`, `vue-best-practices`, `vue-pinia-best-practices`, `vue2-best-practices`, `typescript-advanced-types`, `web-component-design`, `tailwind-design-system`, `frontend-design`, `ui-ux-pro-max`.
 - **lean-ctx** MCP server — the read-only agents list `mcp__lean-ctx__ctx_*` tools explicitly.
-- **Memory** — the `setup-obsidian-memory` skill's `SubagentStart` hook injects Standards + Learnings into every agent. Without it, agents run on CLAUDE.md alone.
+- **Memory** — the `setup-obsidian-memory` skill puts Standards (global/org/repo) + the Learnings index into every agent's system prompt via CLAUDE.md `@imports`, and its `obsidian-retrieve.sh` hook injects matching lesson bodies whenever an agent opens or edits a file. Without it, agents run on CLAUDE.md alone.
 
 `frontend` and `dx` declare no `tools:` so they inherit everything (incl. Figma MCP servers); the read-only roles keep explicit allowlists.
 

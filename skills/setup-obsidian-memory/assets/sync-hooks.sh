@@ -17,4 +17,6 @@ for f in obsidian-recall.sh obsidian-capture.sh obsidian-drain.sh obsidian-retri
 done
 
 bash "$SRC/register-hooks.sh"
+cp "$SRC/register-imports.sh" "$DEST/register-imports.sh"; chmod +x "$DEST/register-imports.sh"
+bash "$SRC/register-imports.sh" --global
 echo "synced global hooks ✓ ($DEST)"

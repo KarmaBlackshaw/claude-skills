@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Point-of-use memory retrieval — UserPromptSubmit + PreToolUse(Edit|Write|ctx_edit) hook.
+# Point-of-use memory retrieval — UserPromptSubmit + PreToolUse(Edit|Write|Read|ctx_edit|ctx_read) hook.
 # Session start injects the always-on rules and only the Learnings INDEX; by the
 # time a lesson matters it sits tens of thousands of tokens back and gets
 # "forgotten". This hook scores every memory unit against the current prompt (or
@@ -19,7 +19,7 @@ set -euo pipefail
 
 input=$(cat)
 j() { printf '%s' "$input" | jq -r "$1 // empty" 2>/dev/null || true; }
-cwd="$(j .cwd)"; sid="$(j .session_id)"; ev="$(j .hook_event_name)"
+cwd="$(j .cwd)"; sid="$(j .session_id)"; ev="$(j .hook_event_name)"; aid="$(j .agent_id)"
 PTR="${cwd:-.}/CLAUDE.local.md"; [ -f "$PTR" ] || exit 0
 getpath() { grep -m1 "^$1=" "$PTR" 2>/dev/null | cut -d= -f2- || true; }
 LEARNINGS="$(getpath LEARNINGS)"; [ -n "$LEARNINGS" ] || exit 0
@@ -32,7 +32,7 @@ S="$(getpath STANDARDS)"; R="$(getpath CODING_RULES)"
 # Cross-org lessons: one dir above the vaults, mirroring GLOBAL_STANDARDS.
 GL="$(getpath GLOBAL_LEARNINGS)"; : "${GL:=$(dirname "$(dirname "$LEARNINGS")")/Learnings}"
 
-# Query text: the prompt, or the path of the file about to be edited plus a few
+# Query text: the prompt, or the path of the file about to be edited/read plus a few
 # stack words its extension implies (so `Foo.vue` also pulls Vue/props lessons).
 case "$ev" in
   UserPromptSubmit) q="$(j .prompt)" ;;
@@ -75,7 +75,9 @@ for f in "$G" "$S" "$R"; do [ -n "$f" ] && [ -f "$f" ] && files+=("$f"); done
 [ "${#files[@]}" -gt 0 ] || exit 0
 
 SEEN_DIR="${SYNC_BRAIN_HOME:-$HOME/.claude/sync-brain}/seen"; mkdir -p "$SEEN_DIR"
-SEEN="$SEEN_DIR/${sid:-nosid}"; touch "$SEEN"
+# A subagent shares the parent's session id but not its context — key its
+# seen-set per agent so lessons the parent already saw still reach it.
+SEEN="$SEEN_DIR/${sid:-nosid}${aid:+-$aid}"; touch "$SEEN"
 KEYS="$(mktemp)"; trap 'rm -f "$KEYS"' EXIT
 
 # One pass. Score = sum over query tokens (3 if in the unit's header, else 1 if in
@@ -116,7 +118,7 @@ out="$(awk -v toks="$toks" -v seen="$SEEN" -v keys="$KEYS" -v g="$G" -v s="$S" -
 [ -n "$out" ] || exit 0
 cat "$KEYS" >> "$SEEN"
 
-what="this prompt"; [ "$ev" = PreToolUse ] && what="the file you are about to edit"
+what="this prompt"; [ "$ev" = PreToolUse ] && what="the file you are about to open"
 jq -n --arg e "$ev" --arg c "# Memory matched to $what (Obsidian — rules + lessons learned the hard way; apply them)
 
 $out" '{hookSpecificOutput:{hookEventName:$e,additionalContext:$c}}'

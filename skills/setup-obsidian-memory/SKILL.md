@@ -5,7 +5,7 @@ description: Use when wiring a repository into an Obsidian hub-and-spoke long-te
 
 # Setup Obsidian Memory
 
-Bootstraps hub-and-spoke long-term memory into the **current repo**: a shared Obsidian vault (`Learnings.md` hub + per-repo `Active Context.md` spoke), a gitignored `CLAUDE.local.md` path pointer, and the **machine-global memory hooks** — a SessionStart recall + drain and a SessionEnd capture — that persist and synthesize sessions.
+Bootstraps hub-and-spoke long-term memory into the **current repo**: a shared Obsidian vault (`Learnings.md` hub + per-repo `Active Context.md` spoke), a gitignored `CLAUDE.local.md` path pointer that also `@imports` the always-on tiers (org Standards, repo Coding Rules, Learnings index) into the system prompt of every session and subagent, and the **machine-global memory hooks** — a SessionStart recall + drain, a SessionEnd capture, and point-of-use lesson retrieval — that persist and synthesize sessions.
 
 **Core principle:** the vault paths live in ONE gitignored file (`CLAUDE.local.md`); hooks and the runtime skill grep them from there. Nothing committed or published ever hardcodes a personal path.
 
@@ -13,7 +13,7 @@ Bootstraps hub-and-spoke long-term memory into the **current repo**: a shared Ob
 
 **Capture/synthesis pipeline (replaces the old Stop-hook push).** `obsidian-capture.sh` (SessionEnd) queues the finished session into `~/.claude/sync-brain/queue/` and kicks a detached `obsidian-drain.sh`; the drain synthesizes each queued session out-of-band via a headless `claude` run that writes the spoke, then archives it. Editorial judgment (headline / learnings) is out of the hot path, so there is no "correction not saved" problem. `obsidian-push.sh` is retired.
 
-**Recall is two-tier.** Session start (and every subagent start) injects the always-on layer (Standards → Coding Rules) plus the Learnings **indexes**, open Threads, and Active Context — in that priority, packed whole-section under a ~9.4 K-char budget (`RECALL_BUDGET`): the harness inlines hook context only up to 10,000 chars and otherwise swaps in a 2 KB preview, so anything that doesn't fit is spilled to `~/.claude/sync-brain/recall/<session>.md` with a pointer line instead of being silently cut — narrowed to the repo's **domains**, auto-detected from its manifests (`package.json` deps → Frontend / Mobile / Backend-Data, `supabase/` or `*.sql` or `pyproject`/`go.mod` → Backend-Data; Workflow always; no manifest → Workflow only). `DOMAINS=` in the pointer overrides detection (`all` = every spoke). Lesson **bodies** are never injected up front: `obsidian-retrieve.sh` scores every memory unit — rule bullets from all three Standards tiers, `###` lessons in the org **and** global spokes, legacy one-lesson-per-file atomic notes — against each prompt (UserPromptSubmit) and each file about to be edited (PreToolUse on Edit/Write/lean-ctx `ctx_edit`), and injects the top matches in full, once per session, right where attention is strongest. Growth in the vault costs nothing per session — only the matched units ever load.
+**Recall is two-tier.** Session start (and every subagent start) injects the always-on layer (Standards → Coding Rules) plus the Learnings **indexes**, open Threads, and Active Context — in that priority, packed whole-section under a ~9.4 K-char budget (`RECALL_BUDGET`): the harness inlines hook context only up to 10,000 chars and otherwise swaps in a 2 KB preview, so anything that doesn't fit is spilled to `~/.claude/sync-brain/recall/<session>.md` with a pointer line instead of being silently cut — narrowed to the repo's **domains**, auto-detected from its manifests (`package.json` deps → Frontend / Mobile / Backend-Data, `supabase/` or `*.sql` or `pyproject`/`go.mod` → Backend-Data; Workflow always; no manifest → Workflow only). `DOMAINS=` in the pointer overrides detection (`all` = every spoke). Lesson **bodies** are never injected up front: `obsidian-retrieve.sh` scores every memory unit — rule bullets from all three Standards tiers, `###` lessons in the org **and** global spokes, legacy one-lesson-per-file atomic notes — against each prompt (UserPromptSubmit) and each file about to be edited or read (PreToolUse on Edit/Write/Read and lean-ctx `ctx_edit`/`ctx_read` — so read-only reviewer subagents get lessons at the point of use too), and injects the top matches in full, once per session, right where attention is strongest. Growth in the vault costs nothing per session — only the matched units ever load.
 
 **REQUIRED COMPANION:** the `sync-brain` skill does the runtime read/write. This skill only wires the plumbing. If `~/.claude/skills/sync-brain/` is missing, tell the user to install it (same agentic-ai skills repo) before relying on push/pull.
 
@@ -32,11 +32,11 @@ Bootstraps hub-and-spoke long-term memory into the **current repo**: a shared Ob
 | `<vault>/Projects/<repo>/<repo>.md` | This repo's session-log spoke — the **folder-note** (frontmatter-tagged `project/<repo>`); its sibling conventions note is `<repo> — Coding Rules.md` |
 | `<vault>/Projects/<repo>/<repo> — Threads.md` | This repo's **open-threads ledger** — durable follow-ups that survive session rotation (recall injects the `open` rows) |
 | `<vault>/.obsidian/graph.json` | Graph view config: tag nodes on + color groups (created once per vault, only if absent) |
-| `<repo>/CLAUDE.local.md` | **gitignored** — declares the vault paths (single source of truth); its presence is what wires the repo |
-| `~/.claude/hooks/obsidian-recall.sh` | SessionStart (skips `compact`) + SubagentStart → injects memory into the session and into every subagent |
+| `<repo>/CLAUDE.local.md` | **gitignored** — declares the vault paths (single source of truth); its presence is what wires the repo. Ends with a `## Memory imports` block of `@path` lines (written by `register-imports.sh`) that load org Standards + repo Coding Rules + the Learnings index into the system prompt — no size cap, reaches every subagent |
+| `~/.claude/hooks/obsidian-recall.sh` | SessionStart (skips `compact`) → injects the session-scoped remainder (open Threads, Active Context); the always-on tiers come in via the `@imports` instead |
 | `~/.claude/hooks/obsidian-capture.sh` | SessionEnd → queues the session + kicks the drain |
 | `~/.claude/hooks/obsidian-drain.sh` | SessionStart (async catch-up) + detached from capture → synthesizes queued sessions into their spoke |
-| `~/.claude/hooks/obsidian-retrieve.sh` | UserPromptSubmit + PreToolUse(Edit\|Write\|ctx_edit) → injects the lesson bodies that match the prompt / edited file (point-of-use recall) |
+| `~/.claude/hooks/obsidian-retrieve.sh` | UserPromptSubmit + PreToolUse(Edit\|Write\|Read\|ctx_edit\|ctx_read) → injects the lesson bodies that match the prompt / file about to be edited or read (point-of-use recall; seen-set keyed per agent so subagents get their own pass) |
 | `~/.claude/hooks/obsidian-domains.sh` | sourced by recall + retrieve — detects the repo's Learnings domains from its manifests (`DOMAINS=` overrides) |
 | `~/.claude/settings.json` | registers all four, once, machine-wide |
 
@@ -78,6 +78,12 @@ Store the chosen root as `VAULT`. Define paths (the spoke is a **folder-note**: 
 ### 4. Write the pointer (`CLAUDE.local.md`)
 Create `$REPO/CLAUDE.local.md` from the **Pointer seed** below, substituting the real absolute paths into the machine-readable `KEY=value` block. Domains are **auto-detected** from the repo's manifests — leave `DOMAINS=` out. Set it only to override: `DOMAINS=Frontend,Workflow` to pin, `DOMAINS=all` to see every spoke. Check what detection picked in the Verify step (the recall output says `filtered to …`). **Do NOT touch the committed `CLAUDE.md`** — it stays authoritative for code conventions.
 
+Then add the imports and pre-approve them (imports outside the project dir are silently dropped until the project is approved in `~/.claude.json`; the script sets the flag so headless runs and subagents load them from the first session):
+```bash
+bash "$SKILL_DIR/assets/register-imports.sh" "$REPO"
+```
+Idempotent — appends only the `@path` lines that are missing. Claude Code's import parser stops at whitespace (an em-dash is fine), so a vault path with spaces (`<repo> — Coding Rules.md`) is imported through a space-free symlink the script creates under `~/.claude/imports/`. Verified: imports reach subagents; the approval flag is per project and headless runs never prompt for it.
+
 ### 5. Gitignore the pointer
 ```bash
 git -C "$REPO" check-ignore CLAUDE.local.md >/dev/null 2>&1 || printf '\n# Claude local memory pointer (machine-specific Obsidian paths)\nCLAUDE.local.md\n' >> "$REPO/.gitignore"
@@ -87,7 +93,7 @@ git -C "$REPO" check-ignore CLAUDE.local.md >/dev/null 2>&1 || printf '\n# Claud
 ```bash
 bash "$SKILL_DIR/assets/sync-hooks.sh"
 ```
-One command, no repo arg: copies the current `obsidian-recall.sh` + `obsidian-capture.sh` + `obsidian-drain.sh` + `obsidian-retrieve.sh` + `obsidian-domains.sh` into `~/.claude/hooks/` and merges the hooks into `~/.claude/settings.json` only if absent. Idempotent — a no-op if already installed. Because wiring is by `CLAUDE.local.md` presence, once this has run once the repo you just pointed (Step 4) is already wired; there is nothing per-repo to install. Settings are never edited by hand.
+One command, no repo arg: copies the current `obsidian-recall.sh` + `obsidian-capture.sh` + `obsidian-drain.sh` + `obsidian-retrieve.sh` + `obsidian-domains.sh` + `register-imports.sh` into `~/.claude/hooks/`, merges the hooks into `~/.claude/settings.json` only if absent, and adds the global-Standards `@import` to `~/.claude/CLAUDE.md` (the ungated top tier, every repo). Idempotent — a no-op if already installed. Because wiring is by `CLAUDE.local.md` presence, once this has run once the repo you just pointed (Step 4) is already wired; there is nothing per-repo to install. Settings are never edited by hand.
 
 ### 7. Conflict check (critical)
 A Stop/PostCompact hook that does `cat >` on a vault file will **clobber** the spoke on every fire. Scan both settings for one:

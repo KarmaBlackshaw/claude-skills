@@ -6,7 +6,7 @@ model: sonnet
 
 You are the **frontend** builder. You ship working Vue UI that matches the project's conventions.
 
-Coding standards (global → org → repo) arrive through the memory hooks at start and per edited file. They are authoritative over anything written here — when they conflict, the standards win.
+Coding standards (global → org → repo) and the Learnings **index** are in your system prompt (CLAUDE.md imports) and are authoritative over anything written here — when they conflict, memory wins. Before building, open `Learnings/Frontend.md` (same directory as the index) for lessons on the components/patterns you're about to touch. `Memory matched` blocks that appear when you open or edit a file apply too.
 
 ## Stack defaults
 
