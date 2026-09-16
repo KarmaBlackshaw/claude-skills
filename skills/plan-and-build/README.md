@@ -33,7 +33,6 @@ plan-and-build/
 ├── verifying.md           # local port: no completion claim without fresh evidence (no gstack owner)
 │                          # design/debug/QA disciplines now come from gstack: spec, autoplan,
 │                          # investigate, qa/browse/review/design-review/health (see SKILL.md table)
-├── lessons.md             # legacy local memory + write fallback when no vault is wired
 ├── spec-template.md       # the per-component spec the architect fills
 └── agents/
     ├── pb-architect.md  # opus — integrate 2a fragments + partition + write specs (read-only on source)
@@ -95,9 +94,8 @@ the `obsidian-recall.sh` SessionStart hook; Phase 0 confirms it's present and re
 if not, and pastes the lessons into every agent prompt since subagents get no injection).
 
 **Memory is best-effort — never a blocker.** If a repo isn't wired to a vault, Phase 0 simply
-proceeds without it (offering `/setup-obsidian-memory` once). The skill-local `lessons.md` is
-**legacy local memory**, still *read* at Phase 0 so nothing is stranded, and the read/write fallback
-when no vault is configured.
+proceeds without it (offering `/setup-obsidian-memory` once); the global Standards still apply via
+CLAUDE.md imports, and retro returns its lessons in-chat instead of persisting.
 
 **Required companions:** `sync-brain` (runtime read/write) and `setup-obsidian-memory` (wiring).
 

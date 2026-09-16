@@ -77,8 +77,8 @@ The pipeline scales to the task. Ceremony applied to a task that didn't need it 
    - **Rules + index → system prompt.** The three Standards tiers and the Learnings index come in via CLAUDE.md `@imports` (they reach subagents too). Confirm your context holds a `# 🌍 Global Coding Standards` section and the `## Lessons by domain` index. Missing → `cat` the paths from the `KEY=value` block yourself.
    - **Active Context + Threads → SessionStart hook.** `obsidian-recall.sh` inlines the open Threads and either inlines Active Context or spills it to a file (`# More memory — not inlined … Read \`<path>\``). **A spill pointer is not recall — read that file now**, before Phase 1.
    - **Lesson bodies → point-of-use hook.** `obsidian-retrieve.sh` injects matching `###` lessons as `# Memory matched` blocks on each prompt and each file you open. The prompt that started this run already pulled the first batch; **collect every `Memory matched` block you receive during the run** — they are what you paste into agent prompts. If the task's stack / component names match index lines no block has covered, open that spoke section yourself.
-   Then read the skill-local `lessons.md` (the pipeline's seed DO/DON'T constitution). **Subagents get the Standards + index in their own system prompt and `Memory matched` blocks on the files they open, but NOT this session's already-matched lessons, Active Context, or Threads** — so every dispatch below carries a `--- MEMORY ---` block (see *Dispatch templates*) with the matched lesson bodies + the Active-Context / Threads lines that bear on the task, pasted verbatim.
-4. **If the repo is NOT wired** (`CLAUDE.local.md` absent, or no `LEARNINGS=`): **memory is best-effort — proceed without it, this is not a blocker.** Offer `/setup-obsidian-memory` once as a suggestion (never nag, never halt), and fall back to the skill-local `lessons.md` (read + write) for this run. The global Standards still apply — they are imported in every repo.
+   **Subagents get the Standards + index in their own system prompt and `Memory matched` blocks on the files they open, but NOT this session's already-matched lessons, Active Context, or Threads** — so every dispatch below carries a `--- MEMORY ---` block (see *Dispatch templates*) with the matched lesson bodies + the Active-Context / Threads lines that bear on the task, pasted verbatim.
+4. **If the repo is NOT wired** (`CLAUDE.local.md` absent, or no `LEARNINGS=`): **memory is best-effort — proceed without it, this is not a blocker.** Offer `/setup-obsidian-memory` once as a suggestion (never nag, never halt). The global Standards still apply — they are imported in every repo; retro returns its lessons in-chat instead of persisting.
 
 ### Phase 1 — Brainstorm → spec (scaled, gstack `spec`)
 **Assign a PROVISIONAL lane here** — this is the call that decides whether gstack `spec` and the Phase-2a fan-out run, so it cannot wait for Phase 2b. Ambiguity routes UP. Phase 3 confirms or upgrades it.
@@ -112,7 +112,7 @@ Execute the dispatch plan wave by wave:
 Every builder prompt contains, **inline**:
 1. the FULL contents of its spec file (never "go read the spec") — including its `## Skills` section
 2. its owned file paths + the rule: **touch ONLY these files**
-3. the relevant memory lessons (from Obsidian, or the `lessons.md` fallback)
+3. the `--- MEMORY ---` block (Standards mandate + this session's matched lesson bodies)
 4. the contents of `verifying.md` + the instruction: **on any verify failure, invoke gstack `investigate`** to find the root cause before patching (it holds the `Skill` tool — invoke, don't guess)
 5. complexity tag + the project's verify command (whatever the architect discovered — e.g. the typecheck script)
 6. the explicit instruction: **invoke every skill in the spec's "Builder MUST invoke" list before writing code**
@@ -156,10 +156,10 @@ re-run QA on the SAME scope. Repeat until both verdicts pass or **3 rounds**. St
 across all components. The spec is the contract — no spec satisfied, not done.
 
 ### Phase 6 — Retro (always, self-learning → Obsidian)
-**Runs LAST, after the Report is already on screen — that ordering IS the mechanism.** Emit the full Report text FIRST, then dispatch `retro` in the SAME message (report text precedes the tool call). Nothing in the report reads retro's result, so the user never waits on memory writes. Dispatch the `retro` agent with: what required rework, repeated QA findings, user corrections, and what worked. It distills **generalizable** (cross-project) lessons and **promotes them to the Obsidian hub via the sync-brain Promotion gate** — a `###` in the matching domain spoke + one index line, never a new file; rule-shaped takeaways come back as `candidate rule (tier)` for you to offer `/sync-brain <tier> <rule>` — while the run headline goes to `ACTIVE_CONTEXT` and open follow-ups to `THREADS`. Deduped; most runs promote nothing to the hub. When the repo isn't wired to a vault, it appends to the skill-local `lessons.md` fallback instead. This is how the skill knows what and what NOT to do next time.
+**Runs LAST, after the Report is already on screen — that ordering IS the mechanism.** Emit the full Report text FIRST, then dispatch `retro` in the SAME message (report text precedes the tool call). Nothing in the report reads retro's result, so the user never waits on memory writes. Dispatch the `retro` agent with: what required rework, repeated QA findings, user corrections, and what worked. It distills **generalizable** (cross-project) lessons and **promotes them to the Obsidian hub via the sync-brain Promotion gate** — a `###` in the matching domain spoke + one index line, never a new file; rule-shaped takeaways come back as `candidate rule (tier)` for you to offer `/sync-brain <tier> <rule>` — while the run headline goes to `ACTIVE_CONTEXT` and open follow-ups to `THREADS`. Deduped; most runs promote nothing to the hub. When the repo isn't wired to a vault, it returns the lessons in-chat for the user to place. This is how the skill knows what and what NOT to do next time.
 
 ### Report
-Components built · specs written (count should match builders) · files changed · build/lint/typecheck status (quoted) · QA findings (both verdicts) · retro: dispatched async — post its promoted-lesson list (or "no new lessons") as a follow-up once it returns; **never state lessons as promoted before retro has returned them**. **No "done" without fresh verification evidence** (`verifying.md`) and the spec-satisfaction gate passed. **Deliver the report immediately — Retro (Phase 6) runs async and never gates it.** Then ask before any git op.
+Components built · specs written (count should match builders) · files changed · build/lint/typecheck status (quoted) · QA findings (both verdicts) · retro: dispatched async — when it returns, **verify the write landed before relaying it**: `grep -F '### <header retro named>' <spoke path>` (and the Threads row if any); post the promoted-lesson list only for headers the grep finds, and flag any it doesn't. **Retro's word is not evidence; never state lessons as promoted before the grep confirms them.** **No "done" without fresh verification evidence** (`verifying.md`) and the spec-satisfaction gate passed. **Deliver the report immediately — Retro (Phase 6) runs async and never gates it.** Then ask before any git op.
 
 ## Agents (bundled here, except the Phase-2a specialists)
 
@@ -170,7 +170,7 @@ Components built · specs written (count should match builders) · files changed
 | 4 | `executor-haiku` / `executor` / `executor-opus` | haiku / sonnet / opus | **invoke the spec's named skills**, build owned files, debug to root cause, verify with evidence |
 | 5 | `qa-reviewer` | sonnet | verify diff vs spec + **code quality** + Standards + project conventions (two verdicts) |
 | 5 | `jeash:review` / `jeash:qa` (heavy lane) | per-agent | whole-diff Standards / Learnings review + integration QA (spec + baseline verify + runtime), read-only. **NOT bundled here** — jeash plugin; absent → gstack `review` + `qa-only` fallback |
-| 6 | `retro` | sonnet | promote generalizable lessons to Obsidian (sync-brain gate); `lessons.md` fallback |
+| 6 | `retro` | sonnet | promote generalizable lessons to Obsidian (sync-brain gate) + Threads rows; unwired → lessons in-chat |
 
 > `pb-architect` + all three executors hold the `Skill` tool. `pb-architect` invokes guidance skills (and bakes their rules into specs) and names action skills per component; builders invoke only the action skills their spec lists. qa-reviewer + retro do not invoke skills.
 
@@ -184,8 +184,6 @@ The skill's long-term memory is the **Obsidian vault**, a four-tier ladder share
 Paths are resolved from the repo's gitignored `CLAUDE.local.md` `KEY=value` block — **never hardcoded**. **When wired, ALWAYS verified at Phase 0** (all three deliveries — Phase 0 step 3; never skip a wired vault), written at Phase 6 via **sync-brain's Promotion gate** (reusable + behavior-changing + not-already-covered; most takeaways never reach the hub) as a `###` in the matching spoke + one index line — never a new per-lesson file.
 
 **REQUIRED COMPANIONS:** the `sync-brain` skill (runtime read/write) and `setup-obsidian-memory` skill (wires a repo to the vault). Memory is **best-effort** — if a repo isn't wired, Phase 0 proceeds without it (offers `/setup-obsidian-memory` once; never blocks).
-
-**`lessons.md` — legacy local memory + write fallback.** It is *read* at Phase 0 alongside the Obsidian hub (so its accumulated lessons are never stranded), and it is the read/write fallback at Phase 6 **only when the repo isn't wired to a vault**. It holds only generalizable, cross-project lessons; project-specific conventions are discovered live. Its durable subset can be migrated into a domain spoke via `/sync-brain` (a one-time curation, gated by the Promotion rule).
 
 ## Skill discovery — `using-skills.md`
 
@@ -228,7 +226,7 @@ Standards (global → org → repo) and the Learnings index are in your system p
 Standards violation is a defect. Lesson bodies also arrive as `Memory matched` blocks on files you
 open. Matched this session (verbatim):
 <every `Memory matched` lesson body collected so far + the Active-Context / Threads lines that bear
-on this task — or the lessons.md seed rules when no vault>
+on this task — or "no vault wired; Standards still apply" when unwired>
 --- END MEMORY ---
 
 Explore the project (its CLAUDE.md / conventions / existing patterns) for YOUR domain only, then
@@ -271,7 +269,7 @@ Standards (global → org → repo) and the Learnings index are in your system p
 Standards violation is a defect. Lesson bodies also arrive as `Memory matched` blocks on files you
 open. Matched this session (verbatim):
 <every `Memory matched` lesson body collected so far + the Active-Context / Threads lines that bear
-on this task — or the lessons.md seed rules when no vault>
+on this task — or "no vault wired; Standards still apply" when unwired>
 --- END MEMORY ---
 
 Follow the project's conventions (per the spec) and the Standards in your prompt. Then LOOP: self-check your output against the
@@ -294,7 +292,7 @@ Standards (global → org → repo) and the Learnings index are in your system p
 Standards violation is a defect. Lesson bodies also arrive as `Memory matched` blocks on files you
 open. Matched this session (verbatim):
 <every `Memory matched` lesson body collected so far + the Active-Context / Threads lines that bear
-on this task — or the lessons.md seed rules when no vault>
+on this task — or "no vault wired; Standards still apply" when unwired>
 --- END MEMORY ---
 
 Your checklist = the Standards in your prompt + the MEMORY block + the project's conventions (its
@@ -319,7 +317,7 @@ Standards (global → org → repo) and the Learnings index are in your system p
 Standards violation is a defect. Lesson bodies also arrive as `Memory matched` blocks on files you
 open. Matched this session (verbatim):
 <every `Memory matched` lesson body collected so far + the Active-Context / Threads lines that bear
-on this task — or the lessons.md seed rules when no vault>
+on this task — or "no vault wired; Standards still apply" when unwired>
 --- END MEMORY ---
 
 jeash:review → ranked findings with file:line (structure, reuse, conventions); cite `Standards.md §…` /
@@ -344,11 +342,10 @@ typecheck/lint/build (quoted), runtime drive of the changed flow via gstack `qa-
 | Claiming done/passing without running verify | Evidence before claims (`verifying.md`) — quote fresh output |
 | Blind-implementing or performatively agreeing to a QA finding | Evaluate technically; push back with reasoning if the finding is wrong |
 | Auto-committing | Ask the user first |
-| Writing lessons to `lessons.md` while a vault is wired | Promote to Obsidian via sync-brain; `lessons.md` is the fallback only |
 | Treating the hook banner or a spill pointer as recall | Verify each delivery (Standards section in prompt · Active Context read, spill file included · `Memory matched` blocks collected); read what's missing yourself |
 | Ignoring a Standards rule because the project's CLAUDE.md didn't say so | Standards (global → org → repo) are conventions as authoritative as CLAUDE.md / lint — a violation is a QA finding cited `Standards.md §…` |
 | Briefing an agent without the `--- MEMORY ---` block | Subagents get Standards + index in their own prompt but not this session's matched lessons / Active Context / Threads — paste them verbatim into every dispatch |
-| Repo not wired to a vault | Proceed best-effort (not a blocker); offer `/setup-obsidian-memory` once, fall back to `lessons.md` |
+| Repo not wired to a vault | Proceed best-effort (not a blocker); offer `/setup-obsidian-memory` once; retro returns lessons in-chat |
 | Editing specs from memory | Re-dispatch `pb-architect` for any structural change |
 | A Phase-2a specialist edits source | Planning is read-only — only builders edit, after pb-architect partitions |
 | pb-architect re-plans each domain from scratch | It integrates fragments — trust the domain call, resolve only cross-domain overlaps |
