@@ -10,7 +10,7 @@ A Claude Code **plugin** that bundles the jeash agent roster **and** matching la
 | `jeash:frontend` | frontend — build Vue 3 + TS + Pinia + Tailwind UI, incl. from Figma | Yes |
 | `jeash:ux` | ux — **sole owner of a11y**, interaction states, layout, design-system fidelity | No — reports |
 | `jeash:dx` | dx — behavior-preserving refactors, type safety, DRY/SOLID/KISS/YAGNI | Yes |
-| `jeash:review` | review — senior-engineer peer review: structure, smells, reuse & libraries (VueUse/lodash-es/…), conventions. No commands, no a11y | No — reports |
+| `jeash:review` | review — senior-engineer peer review: structure, smells, reuse & libraries (per the Standards' Package-first list), conventions. No commands, no a11y | No — reports |
 | `jeash:qa` | qa — functional QA: spec correctness + typecheck/lint/build/tests + runtime drive | No — reports |
 | `jeash:deepen` | deepen — shallow→deep module opportunities as an HTML report | No — reports |
 | `jeash:review-changes` | architect in report-only mode: auto-scoped, vault-grounded review across review / ux / qa | No — reports |
@@ -34,13 +34,13 @@ jeash/
 
 Not declared in the manifest — install separately:
 
-- **gstack** plugin — `spec`, `autoplan`, `investigate`, `health`, `devex-review`, `browse`, `qa-only`, `design-review`, `review`.
+- **gstack** plugin — `spec`, `autoplan`, `investigate`, `health`, `devex-review`, `browse`, `qa-only`, `design-review`.
 - **superpowers** plugin — `superpowers:dispatching-parallel-agents`, `superpowers:verification-before-completion`.
 - **Local skills** from this repo / `~/.claude/skills` — `feature-dev`, `plan-and-build`, `code-review-branch`, `figma-to-vue`, `tailwind-color-token`, `vue-best-practices`, `vue-pinia-best-practices`, `vue2-best-practices`, `typescript-advanced-types`, `web-component-design`, `tailwind-design-system`, `frontend-design`, `ui-ux-pro-max`.
 - **lean-ctx** MCP server — the read-only agents list `mcp__lean-ctx__ctx_*` tools explicitly.
 - **Memory** — the `setup-obsidian-memory` skill puts Standards (global/org/repo) + the Learnings index into every agent's system prompt via CLAUDE.md `@imports`, and its `obsidian-retrieve.sh` hook injects matching lesson bodies whenever an agent opens or edits a file. Without it, agents run on CLAUDE.md alone.
 
-`frontend` and `dx` declare no `tools:` so they inherit everything (incl. Figma MCP servers); the read-only roles keep explicit allowlists.
+`frontend` and `dx` declare no `tools:` so they inherit everything (incl. Figma MCP servers); the read-only roles keep explicit allowlists. `review` / `qa` / `ux` carry `Write` only because the gstack skills they invoke (`qa-only`, `design-review`, `investigate`) declare it — the agent text fences it to out-of-repo artifacts (`~/.gstack/`, temp dir). Subagents have no `AskUserQuestion`, so those skills run on their defaults.
 
 ## Install
 

@@ -1,6 +1,6 @@
 ---
 name: review-changes
-description: Use when the user wants their changes reviewed against the Obsidian vault's captured Standards and Learnings, orchestrated across jeash review lenses — read-only, report only, no edits. Auto-picks scope — a file/dir/branch/PR the user names wins; otherwise uncommitted changes if any exist, otherwise the branch diff. Triggers on "jeash:review-changes", "review my changes", "review my uncommitted changes", "review the branch", "review this PR", "review before I commit", "vault review", "audit against standards", "review against learnings".
+description: Use when the user wants their changes reviewed against the Obsidian vault's captured Standards and Learnings, orchestrated across jeash review lenses — read-only, report only, no edits. Auto-picks scope — a file/dir/branch/PR the user names wins; otherwise uncommitted changes if any exist, otherwise the branch diff. Owns every diff-shaped review request: "jeash:review-changes", "review my changes", "review my uncommitted changes", "review the branch", "review this PR", "review before I commit / merge", "vault review", "audit against standards", "review against learnings". A single named file / folder / feature with no diff framing goes to `jeash:review` alone.
 ---
 
 # jeash:review-changes

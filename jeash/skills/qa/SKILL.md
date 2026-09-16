@@ -1,6 +1,6 @@
 ---
 name: qa
-description: Use when the user wants to validate built work before merge — check correctness against the spec, verify conventions, and run the project's typecheck / lint / build / tests. Triggers on "jeash:qa", "qa", "verify this", "does this pass", "check before merge", "run the typecheck/lint/build/tests".
+description: Use when the user wants to validate built work before merge — check correctness against the spec and run the project's typecheck / lint / build / tests (conventions and code quality are `jeash:review`'s job). Triggers on "jeash:qa", "qa", "verify this", "does this pass", "check before merge", "run the typecheck/lint/build/tests".
 ---
 
 # jeash:qa
