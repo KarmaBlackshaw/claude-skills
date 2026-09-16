@@ -1,11 +1,11 @@
 ---
 name: ux
-description: Use when the user wants to assess or improve how an interface looks and feels — accessibility, interaction states, layout, spacing, typography, responsive behavior, design-system fidelity — or to map a Figma design. Triggers on "jeash:ux", "ux", "review the design", "is this accessible", "improve the layout/spacing", "check a11y".
+description: Use when the user wants to assess or improve how an interface looks and feels — accessibility, interaction states, layout, spacing, typography, responsive behavior, design-system fidelity. Triggers on "jeash:ux", "ux", "review the design", "is this accessible", "improve the layout/spacing", "check a11y".
 ---
 
 # jeash:ux
 
-Launcher for the **ux** lens — judges the interface as a user and a designer, against the project's design system. **Recommends and suggests concrete fixes; defers code edits to `jeash:frontend` unless asked to apply them.**
+Launcher for the **ux** lens — judges the interface as a user and a designer, against the project's design system. Sole owner of accessibility. **Recommends concrete fixes; never edits — code changes go to `jeash:frontend`.**
 
 ## What to do
 

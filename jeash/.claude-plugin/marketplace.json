@@ -1,14 +1,14 @@
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "jeash",
-  "description": "Jeash agents + launcher skills for Claude Code — architect, frontend, ux, dx, review, qa.",
+  "description": "Jeash agents + launcher skills for Claude Code — architect, frontend, ux, dx, review, qa, deepen.",
   "owner": {
     "name": "Jeash"
   },
   "plugins": [
     {
       "name": "jeash",
-      "description": "6 mentionable agents plus jeash:* launcher skills that dispatch them. Library-aware multi-lens review included.",
+      "description": "7 mentionable agents plus jeash:* launcher skills that dispatch them. Peer review, functional QA, a11y, and architecture-deepening as separate lenses.",
       "source": "./",
       "category": "productivity"
     }

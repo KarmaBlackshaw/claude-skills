@@ -13,7 +13,10 @@
 #                                       detached one kicked by capture)
 #   SessionEnd   : obsidian-capture.sh (synchronous + timeout — never async, or
 #                                       it can be killed mid-write at teardown)
-#   UserPromptSubmit / PreToolUse(Edit|Write|MultiEdit) : obsidian-retrieve.sh
+#   SubagentStart: obsidian-recall.sh  (subagents get no SessionStart injection —
+#                                       same blob, so every jeash/plan-and-build
+#                                       agent starts with the standards)
+#   UserPromptSubmit / PreToolUse(Edit|Write|MultiEdit|ctx_edit) : obsidian-retrieve.sh
 #                                       (point-of-use lesson bodies; ms, timeout 5)
 # Usage: register-hooks.sh   (override target with CLAUDE_SETTINGS=…)
 set -euo pipefail
@@ -24,12 +27,14 @@ mkdir -p "$(dirname "$S")"
 
 H="$HOME/.claude/hooks"
 RECALL="bash \"$H/obsidian-recall.sh\" SessionStart"
+SUBRECALL="bash \"$H/obsidian-recall.sh\" SubagentStart"
+RETRIEVE_MATCHER="Edit|Write|MultiEdit|mcp__lean-ctx__ctx_edit"
 DRAIN="bash \"$H/obsidian-drain.sh\""
 CAPTURE="bash \"$H/obsidian-capture.sh\""
 RETRIEVE="bash \"$H/obsidian-retrieve.sh\""
 
 tmp="$(mktemp)"
-jq --arg recall "$RECALL" --arg drain "$DRAIN" --arg capture "$CAPTURE" --arg retrieve "$RETRIEVE" '
+jq --arg recall "$RECALL" --arg subrecall "$SUBRECALL" --arg drain "$DRAIN" --arg capture "$CAPTURE" --arg retrieve "$RETRIEVE" --arg rm "$RETRIEVE_MATCHER" '
   def present(cmd; ev): ([ (.hooks[ev] // [])[].hooks[]?.command ] | any(. == cmd));
   .hooks = (.hooks // {})
   | (if present($recall; "SessionStart") then . else
@@ -45,9 +50,14 @@ jq --arg recall "$RECALL" --arg drain "$DRAIN" --arg capture "$CAPTURE" --arg re
   | (if present($retrieve; "UserPromptSubmit") then . else
       .hooks.UserPromptSubmit = ((.hooks.UserPromptSubmit // []) +
         [{hooks:[{type:"command",command:$retrieve,timeout:5}]}]) end)
+  | (if present($subrecall; "SubagentStart") then . else
+      .hooks.SubagentStart = ((.hooks.SubagentStart // []) +
+        [{hooks:[{type:"command",command:$subrecall,timeout:5}]}]) end)
   | (if present($retrieve; "PreToolUse") then . else
       .hooks.PreToolUse = ((.hooks.PreToolUse // []) +
-        [{matcher:"Edit|Write|MultiEdit",hooks:[{type:"command",command:$retrieve,timeout:5}]}]) end)
+        [{matcher:$rm,hooks:[{type:"command",command:$retrieve,timeout:5}]}]) end)
+  # Matcher may have widened since first registration — refresh it in place.
+  | .hooks.PreToolUse |= map(if ([.hooks[]?.command] | any(. == $retrieve)) then .matcher = $rm else . end)
 ' "$S" > "$tmp" && mv "$tmp" "$S"
 
 jq empty "$S" && echo "registered global obsidian hooks ✓ ($S)"

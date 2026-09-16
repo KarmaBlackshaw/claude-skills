@@ -9,6 +9,6 @@ Launcher for the **architect** — the lead role that owns the shape of the work
 
 ## What to do
 
-**Dispatch the `architect` subagent** (bundled in this plugin at `agents/architect.md`) with the user's request, and let it own decomposition, delegation, file partitioning, the post-build `review` pass, and the final `qa` gate. As the lead session it spawns the other fields as teammates — requires agent teams enabled.
+**Adopt the role in this (lead) session** — read [`agents/architect.md`](../../agents/architect.md) and follow it verbatim. Do **not** dispatch `architect` as a subagent: subagents can't spawn teammates, so a dispatched architect could only plan, never orchestrate. That file is the single source of truth for the mandate, delegation brief, finding schema, skills, and output format — don't work from a summary here.
 
-If the subagent can't be dispatched, **follow [`agents/architect.md`](../../agents/architect.md) verbatim yourself** — that file is the single source of truth for this role's mandate, skills, sequencing, and output format. Don't work from a summary here.
+Requires agent teams (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1`). If teams are unavailable, say so, produce the delegation plan, and dispatch the fields as ordinary subagents wave by wave.

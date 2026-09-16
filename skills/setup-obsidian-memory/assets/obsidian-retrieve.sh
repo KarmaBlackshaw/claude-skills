@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Point-of-use memory retrieval — UserPromptSubmit + PreToolUse(Edit|Write) hook.
+# Point-of-use memory retrieval — UserPromptSubmit + PreToolUse(Edit|Write|ctx_edit) hook.
 # Session start injects the always-on rules and only the Learnings INDEX; by the
 # time a lesson matters it sits tens of thousands of tokens back and gets
 # "forgotten". This hook scores every memory unit against the current prompt (or
@@ -37,7 +37,7 @@ GL="$(getpath GLOBAL_LEARNINGS)"; : "${GL:=$(dirname "$(dirname "$LEARNINGS")")/
 case "$ev" in
   UserPromptSubmit) q="$(j .prompt)" ;;
   PreToolUse)
-    f="$(j .tool_input.file_path)"; [ -n "$f" ] || exit 0
+    f="$(j .tool_input.file_path)"; [ -n "$f" ] || f="$(j .tool_input.path)"; [ -n "$f" ] || exit 0
     case "${f##*.}" in
       vue)     x="vue component props template computed" ;;
       ts|js)   x="typescript" ;;
