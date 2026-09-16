@@ -45,7 +45,7 @@
 ## i18n (only if the project is localized)
 - Where strings live + the keys this component needs: <key: "value"> ...
 
-## Conventions checklist (from the project, discovered by the architect)
+## Conventions checklist (from the Standards tiers + the project, discovered by the architect)
 - [ ] Follows the project's import rules (no redundant / auto-provided imports)
 - [ ] Uses the project's design tokens / theme (no hardcoded style values)
 - [ ] Matches the project's type-safety rules (no loose / unsafe types)

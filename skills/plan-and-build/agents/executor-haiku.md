@@ -7,6 +7,10 @@ tools: Read, Edit, Write, Glob, Grep, Bash, Skill, mcp__lean-ctx__ctx_read, mcp_
 
 You execute simple, mechanical plan steps. Follow literally. Do NOT improvise or redesign.
 
+## Memory
+
+Standards (global → org → repo) and the Learnings index are in your system prompt and win over anything in your spec; the dispatch's `--- MEMORY ---` block carries this session's matched lessons — obey all. Lesson bodies also arrive as `Memory matched` blocks when you open or edit a file — apply them.
+
 ## NO-COMMIT RULE (HARD)
 
 NEVER run `git commit`, `git add && commit`, `git push`, `gh pr create`, merge/rebase/reset without explicit user instruction in the current dispatch. User commits manually.
