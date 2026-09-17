@@ -126,10 +126,17 @@ The step-5 verifier asserts rendered computed styles against this, field by fiel
 
 ## What to do with Figma MCP responses
 
-Sources per section: `get_metadata` → section 1 (tree). `get_design_context` → sections 2, 5, 6 (`fills`, `strokes`, `layoutMode`, `itemSpacing`, `paddingTop/Right/Bottom/Left`, `styles`, `layoutSizingHorizontal` / `layoutSizingVertical` = `FILL` / `HUG` / `FIXED`, `width` / `height`, `absoluteBoundingBox`). `get_variable_defs` → sections 3, 4 (the authoritative bound-variable list). `download_assets` → section 7 exports. Section 8 (match-spec) reprojects the same measured numbers (sections 2/5/6) and colors/text (sections 3/4) into per-node JSON — no new Figma calls, just restructured for machine assertion.
+Sources per section, by what each tool actually returns:
+
+- `get_metadata` → XML tree, one element per node with `id`, `name`, `x`, `y`, `width`, `height`, `hidden`. Section 1 (tree) + the box dims in section 6. A page-level node can return megabytes — call it on the in-scope frame, not the page.
+- `get_design_context` → React + Tailwind **reference code**, one element per node with `data-node-id`. Its classes are Figma's computed values (the Dev Mode Inspect panel): `flex`/`flex-col` = direction, `gap-[Npx]` / `gap-[var(--spacing-10,10px)]` = item spacing, `px-[…]`/`py-[…]`/`p-[…]`/`pt-[…]` = padding, `items-*`/`justify-*` = alignment, `w-[Npx]`/`h-[Npx]`/`size-[Npx]` = fixed dims, `w-full`/`size-full`/`flex-[1_0_0]` = fill, no size class = hug, `rounded-[…]`, `border`, `bg-[var(--token,#hex)]`, `text-[length:var(--font/size/small,13px)]`, `leading-[20px]`, `font-['Poppins:Medium']`. Sections 2, 5, 6. A `var(--name, fallback)` names the bound variable; a bare `[#hex]`/`[Npx]` is unbound. Transcribe the number inside the brackets exactly — 35 stays 35.
+- `get_variable_defs` → the bound-variable list (name → value). Sections 3, 4; authoritative for bound vs unbound.
+- `download_assets` → section 7 exports.
+- Section 8 (match-spec) reprojects the same numbers (sections 2/5/6) and colors/text (sections 3/4) into per-node JSON — no new Figma calls, just restructured for machine assertion.
+
+If a framelink-style `get_figma_data` server is the one available, the same data sits in each node's `layout` block (`mode`, `dimensions`, `padding`, `gap`, `sizing`) and `fills`/`textStyle`.
 
 - Prefer `get_variable_defs` to decide bound vs unbound: a color/text style is **bound** when it appears there as a named variable.
-- Fallback from node data: a color is bound when `boundVariables.fills[0]` resolves to a variable name; a text style is bound when `styles.text` is set — resolve it to the style name.
-- Raw hex in `fills[0].color` with no matching variable is **unbound**.
+- Fallback from the reference code: `bg-[var(--backgrounds/bg-base,white)]` is bound to `backgrounds/bg-base`; `bg-[#efefef]` is unbound. A named text style appears in the response footer ("These styles are contained in the design: Subtitle/Bold: …"); a text node with only `font-[…]`/`text-[length:…]` classes has no named style.
 
 Do not treat "color is defined in a local style but not published" as bound — for the purposes of this skill, only variables and published styles count as bound. Local styles still require a token proposal.

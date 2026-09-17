@@ -26,7 +26,7 @@ If a value has no token match, propose a new token instead. This is non-negotiab
 | Figma value | Tailwind config has... | Action |
 |-------------|------------------------|--------|
 | Exact match (`primary/500` → `primary.500`) | Exact value | Use the token class |
-| Close match (spacing `15px`, config has `4 = 16px`) | Value within 1px / 1 shade | Flag as near-match; let user decide |
+| Close match (spacing `15px`, config has `4 = 16px`) | Value within 1px / 1 shade | Flag as near-match; let user decide. Until decided, build with a proposed exact token (`spacing['3.75']`), never the near class |
 | No match (spacing `22px`, nothing close) | Nothing in range | Propose new token |
 | Unbound color (raw hex from Figma) | — | Propose new token named semantically |
 
@@ -48,7 +48,7 @@ Output for step 2:
 ### Near matches (user decision needed)
 | Figma | Closest Tailwind | Diff | Recommendation |
 |-------|-------------------|------|----------------|
-| spacing 15px | `p-4` (16px) | -1px | Round to p-4 unless pixel-perfect required |
+| spacing 15px | `p-4` (16px) | -1px | Your call: `p-4`, or exact `spacing['3.75']: '0.9375rem'`. Building exact until you answer |
 
 ### Proposed new tokens
 | Figma | Proposed | Config addition |

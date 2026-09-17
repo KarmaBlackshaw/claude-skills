@@ -11,10 +11,11 @@ The default failure mode is optimistic pattern-matching — eyeball the frame, g
 
 ## Core rules (every step)
 
-1. **Inspect, never guess.** Every number — color, spacing, size, width — comes from `get_variable_defs` / `get_design_context` / `get_metadata`. Never read a value off a screenshot; never invent one to "look about right".
-2. **No arbitrary Tailwind values, ever.** `bg-[#hex]`, `p-[17px]`, `text-[15px]`, `w-[342px]`, `rounded-[7px]` are banned in every step. No token for a value? Propose one (use the `tailwind-color-token` skill for hex). Arbitrary values are how design systems rot.
-3. **Run all 5 steps in order. Never skip step 1.** Pause for explicit user approval after step 3, before any code.
-4. **Report design bugs, don't silently fix them.** A discrepancy that stems from the design being wrong is reported — the user decides code vs design.
+1. **Inspect, never guess.** Every number comes from Figma's computed values: the `[Npx]` literals and `var(--token, fallback)` values in the reference code `get_design_context` returns (these **are** the Dev Mode Inspect panel), `get_metadata` `x`/`y`/`width`/`height`, and `get_variable_defs`. Never read a value off a screenshot; never invent one to "look about right".
+2. **No arbitrary Tailwind values in emitted code.** `bg-[#hex]`, `p-[17px]`, `text-[15px]`, `w-[342px]`, `rounded-[7px]` are banned in every `.vue`. The `[Npx]` classes in the reference code you *read* are measurements, not output — transcribe the number, then map it in step 2. No token for a value? Propose one carrying the **exact** value (use the `tailwind-color-token` skill for hex). Arbitrary values are how design systems rot.
+3. **Exact or blocked — never nearest.** A Figma value renders at that value or the file stops on a named blocker. Rounding (35 → `gap-9`), snapping to the closest class (19.5 → `size-5`), dropping a value because it "belongs to the parent" (`pt-[125px]`), or re-nesting the tree so a class fits are all inventing measurements. Step 5 measures 35 vs 36 as a fail; don't spend an iteration on it.
+4. **Run all 5 steps in order. Never skip step 1.** Pause for explicit user approval after step 3, before any code.
+5. **Report design bugs, don't silently fix them.** A discrepancy that stems from the design being wrong is reported — the user decides code vs design.
 
 ## Orchestration — runs under `architect`
 
@@ -67,7 +68,7 @@ Start from the `get_variable_defs` dump (left column), not the render. Discover 
 Mapping table — **Figma value | Tailwind class | Source**:
 
 - **Token match** — existing token maps exactly (`primary/500` → `bg-primary-500`).
-- **Near match** — existing token within 1 unit (1px / closest shade). **Flag it** — user picks near-match vs new token.
+- **Near match** — existing token within 1 unit (1px / closest shade). **Flag it** — user picks near-match vs new token. Until the user answers, the value is the exact one: build with a proposed exact token, never the near class (Core rule 3).
 - **Proposed new token** — no match; propose the exact `tailwind.config` addition (key + value) as a diff.
 
 Decision table and examples: `references/token-mapping.md`. (Core rule 2 applies — no arbitrary values.)
@@ -101,9 +102,31 @@ Only after step 3 is approved.
 
 **Assets:** export the step-1 inventory via `download_assets` into the assets dir; reference real files. Never a placeholder comment, emoji, or box. **Never substitute a visually-similar library icon** (lucide/heroicons/etc.) by eye — a lookalike is not the icon. Use a library icon only when step-3 reuse mapping explicitly maps that node to it; otherwise the exported SVG from the exact node ID is the icon.
 
+**Sizing modes, read from the reference code:** `w-[Npx]` / `h-[Npx]` / `size-[Npx]` = fixed; `w-full` / `size-full` / `flex-[1_0_0]` = fill; no width/height class = hug. A measurement on a wrapper the component doesn't own (`pt-[125px]` on the page column) is the **parent's** value — it goes in the parent's match-spec entry and to the parent's builder, never dropped.
+
+**Tree is the step-3 outline's.** Flattening a wrapper, turning two flex rows into a grid, merging siblings — structural choices happen in step 3 with approval. In step 4 they are drift (`grid-cols-2 gap-9` yields 382px columns where Figma has 382.5).
+
+**Measurement contract — every SFC ships with a class-trace table:**
+
+| Class | Figma value | Source |
+|-------|-------------|--------|
+| `gap-8.75` | 35px | `gap-[35px]` on `1400:83362` |
+| `max-w-form` | 800px | `get_metadata` `width="800"` on `1400:83355` |
+
+`Source` is a quoted field: a reference-code class + node ID, a `get_metadata` dimension, a `get_variable_defs` entry, a step-2 mapping row, or a step-3 outline decision. `rounded`, `nearest`, `inferred`, `dropped` are **not sources** — each such row is a blocker the architect surfaces to the user before the file counts as built. A value with no project token gets the exact value in the config diff (`spacing: { '8.75': '2.1875rem' }`); the user applies config, the builder never picks nearer.
+
+| Rationalization | Reality |
+|-----------------|---------|
+| "Off by 1px — near-match rule" | Near-match is the user's call in step 2. The builder renders exact. |
+| "Tailwind has no `h-4.5` / `w-50`" | Propose the token with the exact value. A nearest class is a guess with a name. |
+| "That offset belongs to the page, not my component" | Then it belongs in the page's spec — hand it up, don't drop it. |
+| "Pure wrapper, flattened" / "two rows == a grid" | Structure is the approved outline. Re-nesting changes widths. |
+| "Extra wrapper for DRY — same box" | Structure is the approved outline; DRY is the post-build `dx` pass. |
+| "0.5px, no visible difference" | Step 5 measures it. Sub-pixel drift is still a fail row. |
+
 **Build bottom-up** — leaves first, composites next, page last. Each `Component` node becomes a self-contained SFC with its step-3 API, never page markup to split later.
 
-**After each file:** (1) lint, (2) typecheck if TS, (3) fix failures before the next file, (4) run its **Phase A visual match** (step 5) before building the next — build → match → next, so a drifted leaf never gets composed. If the dev server/Playwright isn't up, defer Phase A to step 5 and flag it. (5) Report the diff + any `tailwind.config` additions separately (user applies config changes).
+**After each file:** (1) lint, (2) typecheck if TS, (3) fix failures before the next file, (4) run its **Phase A visual match** (step 5) before building the next — build → match → next, so a drifted leaf never gets composed. If the dev server/Playwright isn't up, defer Phase A to step 5 and flag it. (5) Report the diff, the class-trace table, and any `tailwind.config` additions separately (user applies config changes).
 
 ## Step 5: Visual match loop
 
@@ -149,7 +172,7 @@ On `fail`, qa returns its findings to develop; develop fixes and re-lints/re-typ
 ### Guard rails
 
 - **Icon/image diffs are asset diffs, never style diffs.** Don't eyeball paths, tweak size, or swap a similar icon — re-export via `download_assets` from the node ID in §7 and replace the file. Compare = rendered asset **is** that node's export + size/color match spec.
-- **Never emit an arbitrary value to force a pixel match** (Core rule 2). If closing a diff needs a token-less value, flag it as a blocker and stop chasing that diff.
+- **Never emit an arbitrary value to force a pixel match** (Core rule 2). If closing a diff needs a token-less value, propose the exact token and flag it as a blocker; never close it with a nearer class (Core rule 3).
 - **No-progress stop.** If both the diff list **and** the pixel ratio are unchanged from the prior iteration, stop and report. A dropping ratio is progress; a stuck one with an unchanged table is not.
 - **False-diff sources are eliminated at capture, not tolerated in the loop.** Unloaded font, mid-animation frame, blinking caret, placeholder-vs-live copy, and dynamic data are all removed by the deterministic capture in gate step 2 (`fonts.ready`, animations off, seeded copy, masked regions). If one still shows, fix the *capture*, don't excuse the diff. **Layout/size/color diffs are never "noise"** — always real H/M rows.
 - **Fresh eyes are mandatory.** qa is a separate subagent that never saw the build and never persists across iterations (see **The loop** above) — tell it to assume the render is wrong until numbers prove otherwise. develop never QAs its own work; qa never edits.
